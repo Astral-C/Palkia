@@ -52,7 +52,13 @@ private:
 
 public:
 
-	void readStruct(void*, size_t);
+	template<typename T>
+	T readStruct(){
+		assert(mode == OpenMode::In);
+		T out;
+		base.read((char*)&out, sizeof(T));
+		return out;
+	}
 
 	//read functions
 	int8_t readInt8();
@@ -373,11 +379,6 @@ void CFileStream::writeString(std::string v){
 void CFileStream::writeBytes(char* v, size_t size){
 	assert(mode == OpenMode::Out);
 	base.write(v, size);
-}
-
-void CFileStream::readStruct(void* out, size_t size){
-	assert(mode == OpenMode::In);
-	base.read((char*)out, size);
 }
 
 uint8_t CFileStream::peekU8(int offset){
