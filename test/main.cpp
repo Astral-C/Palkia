@@ -11,8 +11,11 @@ int main(){
     tests.registerTest("Load Rom", [](){
         bool passed = true;
         
-        NitroRom Platinum(std::filesystem::path("test/files/platinum.nds"));
-        std::printf("Game Code is %s\n", Platinum.getHeader().gameCode);
+        if(std::filesystem::exists(std::filesystem::path("test/files/platinum.nds"))){
+            bStream::CFileStream stream("test/files/platinum.nds", bStream::OpenMode::In);
+            NitroRom Platinum(stream);
+        }
+        
 
         return passed;
     });

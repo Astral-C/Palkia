@@ -1,4 +1,5 @@
 #include <bstream.h>
+#include <vector>
 
 struct NitroDirEntry {
     uint32_t dirEntryStart;
@@ -6,10 +7,14 @@ struct NitroDirEntry {
     uint16_t dirParentID;
 };
 
-NitroDirEntry ReadDirEntry(bStream::CStream* r){
-    NitroDirEntry entry;
-    entry.dirEntryStart = r->readUInt32();
-    entry.dirEntryFileID = r->readUInt16();
-    entry.dirParentID = r->readUInt16();
-    return entry;
-}
+
+class NitroFNT {
+public:
+    void addDirectory(NitroDirEntry);
+    NitroFNT(){}
+    ~NitroFNT(){}
+
+private:
+    std::vector<NitroDirEntry> NitroDirEntries;
+    
+};

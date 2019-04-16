@@ -1,5 +1,5 @@
 #include <string>
-#include <filesystem>
+#include <NitroFS.h>
 
 typedef struct NitroRomHeader{
     char romID[12];
@@ -45,13 +45,45 @@ typedef struct NitroRomHeader{
     //TODO: finish this
 } NitroRomHeader;
 
+typedef struct NitroBanner {
+    uint16_t version;
+    uint16_t crc16;
+    char reserved[0x1C];
+    uint8_t iconBitmap[0x200];
+    uint16_t iconPalette[0x10];
+
+    char japaneseTitle[0x100];
+    char englishTitle[0x100];
+    char frenchTitle[0x100];
+    char germanTitle[0x100];
+    char italianTitle[0x100];
+    char spanishTitle[0x100];
+} NitroBanner;
+
+// Simple color struct for whenever I need to use textures
+
+typedef union PalkiaColor {
+    struct {
+        uint8_t r;
+        uint8_t g;
+        uint8_t b;
+        uint8_t a;
+    };
+    uint32_t rgba; 
+} PalkiaColor;
+
 class NitroRom {
     public:
         NitroRomHeader getHeader();
-        NitroRom(std::filesystem::path);
+        NitroBanner getBanner();
+        NitroRom(bStream::CFileStream&);
+
+        void getRawIcon(PalkiaColor out[32][32]);
+        
         ~NitroRom(){}
 
     private:
         NitroRomHeader header;
-
+        NitroBanner banner;
+        NitroFNT fnt;
 };

@@ -4,13 +4,14 @@
 #include <fstream>
 #include <cstring>
 #include <cassert>
+#include <algorithm>
 
 namespace bStream {
 
 uint32_t swap32(uint32_t v);
 uint16_t swap16(uint16_t v);
 
-template < typename T >
+template <typename T>
 static inline const T * OffsetPointer(const void * ptr, size_t offs) {
   uintptr_t p = reinterpret_cast<uintptr_t>(ptr);
   p += offs;
