@@ -1,7 +1,7 @@
 #include <functional>
 #include <map>
 
-class UnitTests {
+class Tests {
     private:
         std::map<std::string, std::function<bool()>> tests;
     public:
