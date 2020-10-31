@@ -10,21 +10,13 @@ int main(){
 
     tests.registerTest("Load Rom, Dump Icon", [](){
 
-        try {
-            Palkia::NitroRom Platinum(std::filesystem::path("test/files/platinum.nds"));
+        Palkia::NitroRom Platinum(std::filesystem::path("test/files/platinum.nds"));
+        std::printf("Game Code is %s\n", Platinum.getHeader().gameCode);
 
-            throw "Failed to load rom";
+        Palkia::Color iconBitmap[32][32];
+        Platinum.getRawIcon(iconBitmap);
 
-            std::printf("Game Code is %s\n", Platinum.getHeader().gameCode);
-
-            Palkia::Color iconBitmap[32][32];
-            Platinum.getRawIcon(iconBitmap);
-            stbi_write_png("icon.png", 32, 32, 4, (void*)iconBitmap, 4*32);
-
-        } catch (const char* e){
-	    std::cout << e << std::endl;
-	    return false;
-        }
+        stbi_write_png("icon.png", 32, 32, 4, (void*)iconBitmap, 4*32);
 
         return true;
     });
