@@ -1,6 +1,13 @@
+#include <map>
 #include <string>
-#include <NitroFS.h>
+#include <vector>
+#include <bstream.h>
+#include <filesystem>
+#include "util.h"
 
+namespace Palkia {
+
+#pragma pack(push,1)
 typedef struct NitroRomHeader{
     char romID[12];
     char gameCode[4];
@@ -9,7 +16,8 @@ typedef struct NitroRomHeader{
     uint8_t encryptionSeedSelect;
     uint8_t devCapacity;
     char reserved[7];
-    uint16_t revision;
+    uint8_t reservedDsi;
+    uint8_t region;
     uint8_t version;
     uint8_t flags;
     uint32_t arm9RomOff;
@@ -20,7 +28,7 @@ typedef struct NitroRomHeader{
     uint32_t arm7EntryAddr;
     uint32_t arm7loadAddr;
     uint32_t arm7Size;
-    
+
     uint32_t FNTOffset;
     uint32_t FNTSize;
     uint32_t FATOffset;
@@ -59,31 +67,52 @@ typedef struct NitroBanner {
     char italianTitle[0x100];
     char spanishTitle[0x100];
 } NitroBanner;
+#pragma pack(pop)
 
-// Simple color struct for whenever I need to use textures
 
-typedef union PalkiaColor {
-    struct {
-        uint8_t r;
-        uint8_t g;
-        uint8_t b;
-        uint8_t a;
-    };
-    uint32_t rgba; 
-} PalkiaColor;
+struct FSEntry {
+    uint16_t id;
+    std::string name;
+    size_t fatIndex;
+};
+
+struct FSDir {
+    uint16_t id;
+    std::string name;
+    std::map<std::string, FSDir> dirs;
+    std::map<std::string, FSEntry> files;
+};
+
+class NitroFS {
+    public:
+
+        void parseFS(NitroRomHeader&, bStream::CStream&);
+        FSDir parseDirectory(bStream::CStream&, uint16_t, std::string);
+
+        FSEntry getFileByPath(std::filesystem::path);
+
+        NitroFS();
+        ~NitroFS();
+
+    private:
+        FSDir root;
+
+};
 
 class NitroRom {
     public:
         NitroRomHeader getHeader();
         NitroBanner getBanner();
-        NitroRom(bStream::CFileStream&);
 
-        void getRawIcon(PalkiaColor out[32][32]);
-        
+        NitroRom(std::filesystem::path);
+        void getRawIcon(Color out[32][32]);
         ~NitroRom(){}
 
     private:
         NitroRomHeader header;
         NitroBanner banner;
-        NitroFNT fnt;
+        NitroFS filesystem;
+
 };
+
+}
