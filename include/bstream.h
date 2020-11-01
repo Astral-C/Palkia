@@ -359,9 +359,9 @@ uint8_t* CFileStream::readBytes(size_t size){
 
 std::string CFileStream::readString(size_t len){
 	assert(mode == OpenMode::In);
-    std::string str(len, '\0'); //creates string str at size of length and fills it with '\0'
-    base.read(&str[0], len);
-    return str;
+	std::string str(len, '\0'); //creates string str at size of length and fills it with '\0'
+	base.read(&str[0], len);
+	return str;
 }
 
 void CFileStream::readBytesTo(uint8_t* out_buffer, size_t len){
@@ -371,19 +371,19 @@ void CFileStream::readBytesTo(uint8_t* out_buffer, size_t len){
 
 std::string CFileStream::peekString(size_t at, size_t len){
 	assert(mode == OpenMode::In);
-    std::string str(len, '\0'); //creates string str at size of length and fills it with '\0'
+	std::string str(len, '\0'); //creates string str at size of length and fills it with '\0'
 	size_t cur = base.tellg();
 	base.seekg(at, base.beg);
-    base.read(&str[0], len);
+	base.read(&str[0], len);
 	base.seekg(cur, base.beg);
-    return str;
+	return str;
 }
 
 std::string CFileStream::readWString(size_t len){
 	assert(mode == OpenMode::In);
-    std::string str(len, '\0'); //creates string str at size of length and fills it with '\0'
-    base.read(&str[0], len);
-    return str;
+	std::string str(len, '\0'); //creates string str at size of length and fills it with '\0'
+	base.read(&str[0], len);
+	return str;
 }
 
 void CFileStream::writeInt8(int8_t v){
