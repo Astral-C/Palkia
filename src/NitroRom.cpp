@@ -18,8 +18,8 @@ void NitroRom::getRawIcon(Color out[32][32]){
 
     uint8_t iconBitmapExpanded[0x200 * 2];
     for(int b = 0; b < 0x200; b ++){
-	iconBitmapExpanded[b * 2] = banner.iconBitmap[b] & 0x0F;
-	iconBitmapExpanded[b * 2 + 1] = (banner.iconBitmap[b] & 0xF0) >> 4;
+	    iconBitmapExpanded[b * 2] = banner.iconBitmap[b] & 0x0F;
+	    iconBitmapExpanded[b * 2 + 1] = (banner.iconBitmap[b] & 0xF0) >> 4;
     }
 
     int pixel = 0;
@@ -42,12 +42,13 @@ NitroRom::NitroRom(std::filesystem::path p){
         romFile.seek(header.iconBannerOffset, false);
         banner = romFile.readStruct<NitroBanner>();
 
-        filesystem.parseFS(header, romFile);
-
+        fs.parseFS(header, romFile);
     } else {
         std::printf("File %s not found.\n", p.filename().c_str());
     }
-};
+}
+
+NitroRom::~NitroRom(){}
 
 NitroRomHeader NitroRom::getHeader(){
     return header;
@@ -57,10 +58,18 @@ NitroBanner NitroRom::getBanner(){
     return banner;
 }
 
+NitroFS* NitroRom::getFS(){
+    return &fs;
+}
+
+std::shared_ptr<bStream::CMemoryStream> NitroRom::getFileByPath(std::filesystem::path p){
+    return fs.getFileByPath(p);
+}
+
 NitroFS::NitroFS(){}
 NitroFS::~NitroFS(){}
 
-FSEntry NitroFS::getFileByPath(std::filesystem::path path){
+FSEntry NitroFS::getFileEntryByPath(std::filesystem::path path){
     FSDir d = root;
 
     for (auto &dir : path){
@@ -75,6 +84,22 @@ FSEntry NitroFS::getFileByPath(std::filesystem::path path){
         return {65535, "", 65535}; //Bad
     }
 
+}
+
+std::shared_ptr<bStream::CMemoryStream> NitroFS::getFileByPath(std::filesystem::path path){
+    FSDir d = root;
+
+    for (auto &dir : path){
+        if(d.dirs.count(dir) != 0){
+            d = d.dirs[dir];
+        }
+    }
+
+    if(d.files.count(path.filename()) != 0 && d.files[path.filename()].fatIndex < raw_files.size()){
+        return raw_files.at(d.files[path.filename()].fatIndex);
+    } else{
+        return nullptr;
+    }
 }
 
 FSDir NitroFS::parseDirectory(bStream::CStream& strm, uint16_t id, std::string path){
@@ -103,7 +128,7 @@ FSDir NitroFS::parseDirectory(bStream::CStream& strm, uint16_t id, std::string p
             tempDir.dirs.insert({name, parseDirectory(strm, subdirOff, name)});
 
         } else {
-            tempDir.files.insert({name, {fileId, name, fileId * 0x08}});
+            tempDir.files.insert({name, {fileId, name, fileId}});
             fileId++;
         }
     }
@@ -112,15 +137,27 @@ FSDir NitroFS::parseDirectory(bStream::CStream& strm, uint16_t id, std::string p
 
 void NitroFS::parseFS(NitroRomHeader& header, bStream::CStream& strm){
     bStream::CMemoryStream fntBuffer = bStream::CMemoryStream(header.FNTSize, bStream::Endianess::Little, bStream::OpenMode::In);
+    strm.seek(0, false);
     memcpy(fntBuffer.getBuffer(), strm.getBuffer() + header.FNTOffset, header.FNTSize);
 
-    bStream::CMemoryStream fatBuffer = bStream::CMemoryStream(header.FATSize, bStream::Endianess::Little, bStream::OpenMode::In);
-    memcpy(fatBuffer.getBuffer(), strm.getBuffer() + header.FATOffset, header.FATSize);
+    strm.seek(header.FATOffset, false);
+
+    for (size_t f = 0; f < int(header.FATSize / 8); f++){
+        uint32_t start = strm.readUInt32();
+	    uint32_t end = strm.readUInt32();
+
+        std::shared_ptr<bStream::CMemoryStream> file = std::make_shared<bStream::CMemoryStream>((end - start), bStream::Endianess::Little, bStream::OpenMode::In);
+
+        size_t r = strm.tell();
+        strm.seek(start, false);
+        strm.readBytesTo(file->getBuffer(), file->getCapacity());
+        strm.seek(r, false);
+
+	    raw_files.push_back(file);
+    }
 
     root = parseDirectory(fntBuffer, 0, "");
 
-    FSEntry land_data = getFileByPath("fielddata/land_data/land_data.narc");
-    std::printf("%s : %d\n", land_data.name.c_str(), land_data.id);
 }
 
 }

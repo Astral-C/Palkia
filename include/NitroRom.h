@@ -1,6 +1,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <memory>
 #include <bstream.h>
 #include <filesystem>
 #include "util.h"
@@ -84,17 +85,19 @@ struct FSDir {
 };
 
 class NitroFS {
+
     public:
 
         void parseFS(NitroRomHeader&, bStream::CStream&);
         FSDir parseDirectory(bStream::CStream&, uint16_t, std::string);
-
-        FSEntry getFileByPath(std::filesystem::path);
+        FSEntry getFileEntryByPath(std::filesystem::path);
+        std::shared_ptr<bStream::CMemoryStream> getFileByPath(std::filesystem::path);
 
         NitroFS();
         ~NitroFS();
 
     private:
+        std::vector<std::shared_ptr<bStream::CMemoryStream>> raw_files;
         FSDir root;
 
 };
@@ -103,15 +106,19 @@ class NitroRom {
     public:
         NitroRomHeader getHeader();
         NitroBanner getBanner();
+        NitroFS* getFS();
+
+        std::shared_ptr<bStream::CMemoryStream> getFileByPath(std::filesystem::path);
 
         NitroRom(std::filesystem::path);
         void getRawIcon(Color out[32][32]);
-        ~NitroRom(){}
+
+        ~NitroRom();
 
     private:
         NitroRomHeader header;
         NitroBanner banner;
-        NitroFS filesystem;
+        NitroFS fs;
 
 };
 

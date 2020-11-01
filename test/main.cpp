@@ -21,5 +21,20 @@ int main(){
         return true;
     });
 
+    
+    tests.registerTest("Get file from rom", [](){
+
+        Palkia::NitroRom Platinum(std::filesystem::path("test/files/platinum.nds"));
+        std::shared_ptr<bStream::CMemoryStream> field_data = Platinum.getFileByPath("fielddata/land_data/land_data.narc");
+        if(field_data == nullptr){
+            std::cout << "Didn't find file :(" << std::endl;
+            return false;
+        } else {
+            std::cout << "Should be NARC: ";
+            std::cout << field_data->readString(4) << std::endl;
+            return true;
+        }
+    });
+
     tests.runTests();
 }
