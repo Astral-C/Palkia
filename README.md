@@ -1,5 +1,10 @@
 # Palkia
-A Static C++ Library for D/P/PT Modding
+A Static C++ Library for Nintendo DS Game Modding, with a specific focus on Pokemon D/P/PT
 
-## What does it provide?
-Classes for  roms, archive files, D/P/PT maps, etc etc
+## Planned Features
+ - DS Rom Loading/Saving
+ - Narc Archive Loading/Saving
+ - Pokemon D/P/PT Map Matrix/Map Chunk Loading/Saving
+
+# How to build
+Clone with `git clone --recursive` then build with `cmake .` then `make`
