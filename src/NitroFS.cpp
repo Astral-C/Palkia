@@ -3,7 +3,7 @@
 NitroFS::NitroFS(){}
 NitroFS::~NitroFS(){}
 
-FSEntry* NitroFS::getFileByPath(std::filesystem::path path){
+NitroFile* NitroFS::getFileByPath(std::filesystem::path path){
 	FSDir d = root;
 
 	for (auto &dir : path){
@@ -12,14 +12,15 @@ FSEntry* NitroFS::getFileByPath(std::filesystem::path path){
 		}
 	}
 
+
 	if(d.files.count(path.filename()) != 0){
-		return &d.files[path.filename()];
+		return &files.at(d.files[path.filename()].file_id);
 	} else{
 		return nullptr;
 	}
 }
 
-FSDir NitroFS::parseDirectory(bStream::CStream& strm, std::vector<std::shared_ptr<uint8_t[]>> fat, uint16_t id, std::string path){
+FSDir NitroFS::parseDirectory(bStream::CStream& strm, uint16_t id, std::string path){
 	FSDir tempDir;
 	tempDir.id = id;
 	tempDir.name = path;
@@ -42,10 +43,10 @@ FSDir NitroFS::parseDirectory(bStream::CStream& strm, std::vector<std::shared_pt
 			uint16_t dirId = strm.peekUInt16(dirOffset);
 			dirOffset += 2;
 			uint16_t subdirOff = (dirId & 0x0FFF) * 0x08;
-			tempDir.dirs.insert({name, parseDirectory(strm, fat, subdirOff, name)});
+			tempDir.dirs.insert({name, parseDirectory(strm, subdirOff, name)});
 
 		} else {
-			tempDir.files.insert({name, {fileId, name, fat.at(fileId)}});
+			tempDir.files.insert({name, {fileId, fileId, name}});
 			fileId++;
 		}
 	}
@@ -60,21 +61,18 @@ void NitroFS::parseRoot(bStream::CStream& strm, size_t fnt_offset, size_t fnt_si
 	
 	strm.seek(fat_offset, false);
 
-	std::vector<std::shared_ptr<uint8_t[]>> fat;
-
 	for (size_t f = 0; f < int(fat_size / 8); f++){
 		uint32_t start = strm.readUInt32();
 		uint32_t end = strm.readUInt32();
 
-		std::shared_ptr<uint8_t[]> file = std::make_shared<uint8_t[]>(end - start);
-
+		uint8_t* file = new uint8_t[end - start];
 		size_t r = strm.tell();
 		strm.seek(start, false);
-		strm.readBytesTo(file.get(), end - start);
+		strm.readBytesTo(file, end - start);
 		strm.seek(r, false);
 
-		fat.push_back(file);
+		files.push_back({end - start, file});
 	}
 
-	parseDirectory(fntBuffer, fat, 0, "");
+	root = parseDirectory(fntBuffer, 0, "");
 }

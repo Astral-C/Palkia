@@ -78,7 +78,7 @@ class NitroRom {
 		NitroRomHeader getHeader();
 		NitroBanner getBanner();
 
-		FSEntry* getFileByPath(std::filesystem::path);
+		NitroFile* getFileByPath(std::filesystem::path);
 
 		NitroRom(std::filesystem::path);
 		void getRawIcon(Color out[32][32]);
@@ -86,7 +86,6 @@ class NitroRom {
 		~NitroRom();
 
 	private:
-		void parseFS(NitroRomHeader&, bStream::CStream&);
 
 		NitroRomHeader header;
 		NitroBanner banner;

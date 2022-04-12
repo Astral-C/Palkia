@@ -57,4 +57,10 @@ NitroRomHeader NitroRom::getHeader(){
 NitroBanner NitroRom::getBanner(){
 	return banner;
 }
+
+NitroFile* NitroRom::getFileByPath(std::filesystem::path path){
+	return fs.getFileByPath(path);
 }
+
+}
+
