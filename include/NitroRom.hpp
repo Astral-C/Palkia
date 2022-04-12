@@ -1,10 +1,12 @@
+#pragma once
 #include <map>
 #include <string>
 #include <vector>
 #include <memory>
-#include <bstream.h>
+#include "../bstream/bstream.h"
+#include "NitroFS.hpp"
 #include <filesystem>
-#include "util.h"
+#include "util.hpp"
 
 namespace Palkia {
 
@@ -71,44 +73,12 @@ typedef struct NitroBanner {
 #pragma pack(pop)
 
 
-struct FSEntry {
-	uint16_t id;
-	std::string name;
-	size_t fatIndex;
-};
-
-struct FSDir {
-	uint16_t id;
-	std::string name;
-	std::map<std::string, FSDir> dirs;
-	std::map<std::string, FSEntry> files;
-};
-
-class NitroFS {
-
-	public:
-
-		void parseFS(NitroRomHeader&, bStream::CStream&);
-		FSDir parseDirectory(bStream::CStream&, uint16_t, std::string);
-		FSEntry getFileEntryByPath(std::filesystem::path);
-		std::shared_ptr<bStream::CMemoryStream> getFileByPath(std::filesystem::path);
-
-		NitroFS();
-		~NitroFS();
-
-	private:
-		std::vector<std::shared_ptr<bStream::CMemoryStream>> raw_files;
-		FSDir root;
-
-};
-
 class NitroRom {
 	public:
 		NitroRomHeader getHeader();
 		NitroBanner getBanner();
-		NitroFS* getFS();
 
-		std::shared_ptr<bStream::CMemoryStream> getFileByPath(std::filesystem::path);
+		FSEntry* getFileByPath(std::filesystem::path);
 
 		NitroRom(std::filesystem::path);
 		void getRawIcon(Color out[32][32]);
@@ -116,6 +86,8 @@ class NitroRom {
 		~NitroRom();
 
 	private:
+		void parseFS(NitroRomHeader&, bStream::CStream&);
+
 		NitroRomHeader header;
 		NitroBanner banner;
 		NitroFS fs;

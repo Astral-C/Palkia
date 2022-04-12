@@ -1,6 +1,5 @@
-#include <bstream.h>
-#include <NitroRom.h>
-#include "util.h"
+#include "NitroRom.hpp"
+#include "util.hpp"
 
 namespace Palkia {
 
@@ -42,7 +41,8 @@ NitroRom::NitroRom(std::filesystem::path p){
 		romFile.seek(header.iconBannerOffset, false);
 		banner = romFile.readStruct<NitroBanner>();
 
-		fs.parseFS(header, romFile);
+		fs.parseRoot(romFile, header.FNTOffset, header.FNTSize, header.FATOffset, header.FATSize);
+
 	} else {
 		std::printf("File %s not found.\n", p.filename().c_str());
 	}
@@ -57,107 +57,4 @@ NitroRomHeader NitroRom::getHeader(){
 NitroBanner NitroRom::getBanner(){
 	return banner;
 }
-
-NitroFS* NitroRom::getFS(){
-	return &fs;
-}
-
-std::shared_ptr<bStream::CMemoryStream> NitroRom::getFileByPath(std::filesystem::path p){
-	return fs.getFileByPath(p);
-}
-
-NitroFS::NitroFS(){}
-NitroFS::~NitroFS(){}
-
-FSEntry NitroFS::getFileEntryByPath(std::filesystem::path path){
-	FSDir d = root;
-
-	for (auto &dir : path){
-		if(d.dirs.count(dir) != 0){
-			d = d.dirs[dir];
-		}
-	}
-
-	if(d.files.count(path.filename()) != 0){
-		return d.files[path.filename()];
-	} else{
-		return {65535, "", 65535}; //Bad
-	}
-
-}
-
-std::shared_ptr<bStream::CMemoryStream> NitroFS::getFileByPath(std::filesystem::path path){
-	FSDir d = root;
-
-	for (auto &dir : path){
-		if(d.dirs.count(dir) != 0){
-			d = d.dirs[dir];
-		}
-	}
-
-	if(d.files.count(path.filename()) != 0 && d.files[path.filename()].fatIndex < raw_files.size()){
-		return raw_files.at(d.files[path.filename()].fatIndex);
-	} else{
-		return nullptr;
-	}
-}
-
-FSDir NitroFS::parseDirectory(bStream::CStream& strm, uint16_t id, std::string path){
-	FSDir tempDir;
-	tempDir.id = id;
-	tempDir.name = path;
-	uint32_t dirOffset = strm.peekUInt32(id);
-	uint16_t fileId = strm.peekUInt16(id+4);
-
-	while(true){
-		uint8_t type = strm.peekUInt8(dirOffset++);
-
-		if(type == 0){
-			break;
-		}
-
-		bool isDir = (type & 0x80);
-		uint8_t nameLen = (type & 0x7F);
-		std::string name = strm.peekString(dirOffset, nameLen);
-		dirOffset += nameLen;
-
-		if(isDir){
-			uint16_t dirId = strm.peekUInt16(dirOffset);
-			dirOffset += 2;
-			uint16_t subdirOff = (dirId & 0x0FFF) * 0x08;
-			tempDir.dirs.insert({name, parseDirectory(strm, subdirOff, name)});
-
-		} else {
-			tempDir.files.insert({name, {fileId, name, fileId}});
-			fileId++;
-		}
-	}
-	return tempDir;
-}
-
-void NitroFS::parseFS(NitroRomHeader& header, bStream::CStream& strm){
-	bStream::CMemoryStream fntBuffer = bStream::CMemoryStream(header.FNTSize, bStream::Endianess::Little, bStream::OpenMode::In);
-	strm.seek(0, false);
-	memcpy(fntBuffer.getBuffer(), strm.getBuffer() + header.FNTOffset, header.FNTSize);
-
-	strm.seek(header.FATOffset, false);
-
-	for (size_t f = 0; f < int(header.FATSize / 8); f++){
-		uint32_t start = strm.readUInt32();
-		uint32_t end = strm.readUInt32();
-
-		std::shared_ptr<bStream::CMemoryStream> file = std::make_shared<bStream::CMemoryStream>((end - start), bStream::Endianess::Little, bStream::OpenMode::In);
-
-		size_t r = strm.tell();
-		strm.seek(start, false);
-		strm.readBytesTo(file->getBuffer(), file->getCapacity());
-		strm.seek(r, false);
-
-		raw_files.push_back(file);
-	}
-
-	root = parseDirectory(fntBuffer, 0, "");
-
-}
-
 }
