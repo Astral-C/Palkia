@@ -31,6 +31,8 @@ class NitroFS {
 		NitroFile* NitroFS::getFileByIndex(size_t);
         void parseRoot(bStream::CStream& strm, size_t fnt_offset, size_t fnt_size, size_t fat_offset, size_t fat_size, size_t img_offset, bool has_fnt = true);
 
+		FSDir* getRoot();
+
 		NitroFS();
 		~NitroFS();
 

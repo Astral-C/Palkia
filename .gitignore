@@ -20,5 +20,7 @@ palkia_test
 *.narc
 *.png
 *.bin
+dump
+
 #vscode stuff
 .vscode

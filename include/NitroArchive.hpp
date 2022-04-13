@@ -8,6 +8,7 @@ private:
 
 public:
     NitroFile* getFileByIndex(size_t index);
+    void dump();
     NitroArchive(bStream::CStream& stream);
     ~NitroArchive();
 };
