@@ -11,17 +11,11 @@ struct NitroFile {
 	uint8_t* data;
 };
 
-struct FSEntry {
-	uint16_t id;
-	uint32_t file_id;
-	std::string name;
-};
-
 struct FSDir {
 	uint16_t id;
 	std::string name;
 	std::map<std::string, FSDir> dirs;
-	std::map<std::string, FSEntry> files;
+	std::map<std::string, uint16_t> files;
 };
 
 class NitroFS {

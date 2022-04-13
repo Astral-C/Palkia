@@ -15,20 +15,16 @@ NitroFile* NitroFS::getFileByIndex(size_t index){
 }
 
 NitroFile* NitroFS::getFileByPath(std::filesystem::path path){
-	FSDir d = root;
+	FSDir* d = &root;
 
 	for (auto &dir : path){
-		if(d.dirs.count(dir) != 0){
-			d = d.dirs[dir];
+		if(d->dirs.count(dir) != 0){
+			d = &d->dirs[dir];
 		}
 	}
-			
-	std::cout << "Extracting File from dir " << d.name << std::endl;
 
-
-	if(d.files.count(path.filename()) != 0 && d.files[path.filename()].file_id < d.files.size()){
-		std::cout << " extracting file " << path << " with id " << d.files[path.filename()].file_id << std::endl;
-		return &files[d.files[path.filename()].file_id];
+	if(d->files.count(path.filename()) != 0 && d->files[path.filename()] < d->files.size()){
+		return &files[d->files[path.filename()]];
 	} else{
 		return nullptr;
 	}
@@ -60,7 +56,7 @@ FSDir NitroFS::parseDirectory(bStream::CStream& strm, uint16_t id, std::string p
 			tempDir.dirs.insert({name, parseDirectory(strm, subdirOff, name)});
 
 		} else {
-			tempDir.files.insert({name, {fileId, fileId, name}});
+			tempDir.files.insert({name, fileId});
 			fileId++;
 		}
 	}
@@ -81,7 +77,6 @@ void NitroFS::parseRoot(bStream::CStream& strm, size_t fnt_offset, size_t fnt_si
 		uint32_t start = strm.readUInt32();
 		uint32_t end = strm.readUInt32();
 
-		std::cout << "File start at " << start << " at end " << end << " size " << (end - start) << std::endl;
 		uint8_t* file = new uint8_t[end - start];
 		size_t r = strm.tell();
 		strm.seek(start + img_offset);
