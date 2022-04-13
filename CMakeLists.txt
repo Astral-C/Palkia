@@ -15,18 +15,3 @@ file(GLOB_RECURSE LIBRARY_SOURCE
 )
 
 add_library(palkia STATIC ${LIBRARY_SOURCE})
-
-add_executable(palkia_test test/main.cpp)
-target_link_libraries(palkia_test palkia stdc++fs)
-
-add_custom_command(
-  OUTPUT palkia_run_tests
-  COMMAND palkia_test
-  COMMENT "Running Palkia Library Tests..."
-  VERBATIM
-)
-
-add_custom_target(
-  RunTests ALL
-  DEPENDS palkia_run_tests
-)
