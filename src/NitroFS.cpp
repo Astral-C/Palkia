@@ -22,9 +22,9 @@ NitroFile* NitroFS::getFileByPath(std::filesystem::path path){
 			d = &d->dirs[dir];
 		}
 	}
-
-	if(d->files.count(path.filename()) != 0 && d->files[path.filename()] < d->files.size()){
-		return &files[d->files[path.filename()]];
+	
+	if(d->files.count(path.filename()) != 0 && d->files[path.filename()] < files.size()){
+		return &files.at(d->files[path.filename()]);
 	} else{
 		return nullptr;
 	}
