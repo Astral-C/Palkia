@@ -1,7 +1,18 @@
 #include "NitroFS.hpp"
 
 NitroFS::NitroFS(){}
-NitroFS::~NitroFS(){}
+NitroFS::~NitroFS(){
+	for (auto& file : files){
+		if(file.data != nullptr){
+			delete file.data;
+		}
+	}
+	
+}
+
+NitroFile* NitroFS::getFileByIndex(size_t index){
+	return &files.at(index);
+}
 
 NitroFile* NitroFS::getFileByPath(std::filesystem::path path){
 	FSDir d = root;
@@ -54,12 +65,18 @@ FSDir NitroFS::parseDirectory(bStream::CStream& strm, uint16_t id, std::string p
 }
 
 
-void NitroFS::parseRoot(bStream::CStream& strm, size_t fnt_offset, size_t fnt_size, size_t fat_offset, size_t fat_size){
-	bStream::CMemoryStream fntBuffer = bStream::CMemoryStream(fnt_size, bStream::Endianess::Little, bStream::OpenMode::In);
-	strm.seek(fnt_offset, false);
-	strm.readBytesTo(fntBuffer.getBuffer(), fnt_size);
-	
-	strm.seek(fat_offset, false);
+void NitroFS::parseRoot(bStream::CStream& strm, size_t fnt_offset, size_t fnt_size, size_t fat_offset, size_t fat_size, size_t img_offset, bool has_fnt){
+	if(has_fnt){
+		bStream::CMemoryStream fntBuffer = bStream::CMemoryStream(fnt_size, bStream::Endianess::Little, bStream::OpenMode::In);
+		strm.seek(fnt_offset, false);
+		strm.readBytesTo(fntBuffer.getBuffer(), fnt_size);
+		
+		strm.seek(fat_offset, false);
+		
+		root = parseDirectory(fntBuffer, 0, "");
+	}
+
+	strm.seek(fat_offset);
 
 	for (size_t f = 0; f < int(fat_size / 8); f++){
 		uint32_t start = strm.readUInt32();
@@ -67,12 +84,11 @@ void NitroFS::parseRoot(bStream::CStream& strm, size_t fnt_offset, size_t fnt_si
 
 		uint8_t* file = new uint8_t[end - start];
 		size_t r = strm.tell();
-		strm.seek(start, false);
+		strm.seek(start + img_offset);
 		strm.readBytesTo(file, end - start);
-		strm.seek(r, false);
+		strm.seek(r);
 
 		files.push_back({end - start, file});
 	}
 
-	root = parseDirectory(fntBuffer, 0, "");
 }

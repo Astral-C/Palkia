@@ -1,37 +1,27 @@
-#include <NitroRom.h>
+#include <NitroRom.hpp>
+#include <NitroArchive.hpp>
 #include <filesystem>
 #include <functional>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
 #include "tests.h"
 
 int main(){
 	Tests tests;
 
-	tests.registerTest("Load Rom, Dump Icon", [](){
-
-		Palkia::NitroRom Platinum(std::filesystem::path("test/files/platinum.nds"));
-		std::printf("Game Code is %s\n", Platinum.getHeader().gameCode);
-
-		Palkia::Color iconBitmap[32][32];
-		Platinum.getRawIcon(iconBitmap);
-
-		stbi_write_png("icon.png", 32, 32, 4, (void*)iconBitmap, 4*32);
-
-		return true;
-	});
-
 	
 	tests.registerTest("Get file from rom", [](){
 
-		Palkia::NitroRom Platinum(std::filesystem::path("test/files/platinum.nds"));
-		std::shared_ptr<bStream::CMemoryStream> field_data = Platinum.getFileByPath("fielddata/land_data/land_data.narc");
-		if(field_data == nullptr){
+		Palkia::NitroRom Platinum(std::filesystem::path("platinum.nds"));
+		NitroFile* zone_event_narc = Platinum.getFileByPath("fielddata/eventdata/zone_event.narc");
+		
+
+		if(zone_event_narc == nullptr){
 			std::cout << "Didn't find file :(" << std::endl;
 			return false;
 		} else {
-			std::cout << "Should be NARC: ";
-			std::cout << field_data->readString(4) << std::endl;
+			bStream::CFileStream out = bStream::CFileStream("out.bin", bStream::OpenMode::Out);
+			bStream::CMemoryStream stream = bStream::CMemoryStream(zone_event_narc->data, zone_event_narc->size, bStream::Little, bStream::OpenMode::In);
+			NitroArchive archive(stream);
+			archive.getFileByIndex(0);
 			return true;
 		}
 	});

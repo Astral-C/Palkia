@@ -41,7 +41,7 @@ NitroRom::NitroRom(std::filesystem::path p){
 		romFile.seek(header.iconBannerOffset, false);
 		banner = romFile.readStruct<NitroBanner>();
 
-		fs.parseRoot(romFile, header.FNTOffset, header.FNTSize, header.FATOffset, header.FATSize);
+		fs.parseRoot(romFile, header.FNTOffset, header.FNTSize, header.FATOffset, header.FATSize, 0);
 
 	} else {
 		std::printf("File %s not found.\n", p.filename().c_str());

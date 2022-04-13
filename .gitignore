@@ -15,3 +15,10 @@ test/files
 #build files and executable
 *.a
 palkia_test
+#roms and other
+*.nds
+*.narc
+*.png
+
+#vscode stuff
+.vscode
