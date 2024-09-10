@@ -75,7 +75,7 @@ void FileSystem::ParseRoot(bStream::CStream& strm, size_t fnt_offset, size_t fnt
 
 	strm.seek(fat_offset, false);
 
-	for (size_t f = 0; f < (fat_size / 8) - 1; f++){
+	for (size_t f = 0; f < size_t(fat_size / 8) - 1; f++){
 		uint32_t start = strm.readUInt32();
 		uint32_t end = strm.readUInt32();
 

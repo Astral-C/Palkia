@@ -4,6 +4,7 @@ namespace Palkia::Nitro {
 
 void DumpDir(Directory* dir, FileSystem* mFS, std::filesystem::path out_path){
     for (auto& dir : dir->mDirectories){
+        std::filesystem::create_directory(out_path / dir.first);
         DumpDir(&dir.second, mFS, out_path / dir.first);
     }
 
