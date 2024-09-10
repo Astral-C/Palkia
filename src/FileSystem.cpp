@@ -1,8 +1,10 @@
-#include "NitroFS.hpp"
+#include "FileSystem.hpp"
 
-NitroFS::NitroFS(){}
-NitroFS::~NitroFS(){
-	for (auto& file : files){
+namespace Palkia::Nitro {
+
+FileSystem::FileSystem(){}
+FileSystem::~FileSystem(){
+	for (auto& file : mFiles){
 		if(file.data != nullptr){
 			delete file.data;
 		}
@@ -10,28 +12,28 @@ NitroFS::~NitroFS(){
 	
 }
 
-NitroFile* NitroFS::getFileByIndex(size_t index){
-	return &files.at(index);
+File* FileSystem::GetFileByIndex(size_t index){
+	return &mFiles.at(index);
 }
 
-NitroFile* NitroFS::getFileByPath(std::filesystem::path path){
-	FSDir* d = &root;
+File* FileSystem::GetFileByPath(std::filesystem::path path){
+	Directory* d = &mRoot;
 
 	for (auto &dir : path){
-		if(d->dirs.count(dir) != 0){
-			d = &d->dirs[dir];
+		if(d->mDirectories.count(dir) != 0){
+			d = &d->mDirectories[dir];
 		}
 	}
 	
-	if(d->files.count(path.filename()) != 0 && d->files[path.filename()] < files.size()){
-		return &files.at(d->files[path.filename()]);
+	if(d->mFiles.count(path.filename()) != 0 && d->mFiles[path.filename()] < mFiles.size()){
+		return &mFiles.at(d->mFiles[path.filename()]);
 	} else{
 		return nullptr;
 	}
 }
 
-FSDir NitroFS::parseDirectory(bStream::CStream& strm, uint16_t id, std::string path){
-	FSDir tempDir;
+Directory FileSystem::ParseDirectory(bStream::CStream& strm, uint16_t id, std::string path){
+	Directory tempDir;
 	tempDir.id = id;
 	tempDir.name = path;
 	uint32_t dirOffset = strm.peekUInt32(id);
@@ -53,27 +55,27 @@ FSDir NitroFS::parseDirectory(bStream::CStream& strm, uint16_t id, std::string p
 			uint16_t dirId = strm.peekUInt16(dirOffset);
 			dirOffset += 2;
 			uint16_t subdirOff = (dirId & 0x0FFF) * 0x08;
-			tempDir.dirs.insert({name, parseDirectory(strm, subdirOff, name)});
+			tempDir.mDirectories.insert({name, ParseDirectory(strm, subdirOff, name)});
 
 		} else {
-			tempDir.files.insert({name, fileId});
+			tempDir.mFiles.insert({name, fileId});
 			fileId++;
 		}
 	}
 	return tempDir;
 }
 
-void NitroFS::parseRoot(bStream::CStream& strm, size_t fnt_offset, size_t fnt_size, size_t fat_offset, size_t fat_size, size_t img_offset, bool has_fnt){
+void FileSystem::ParseRoot(bStream::CStream& strm, size_t fnt_offset, size_t fnt_size, size_t fat_offset, size_t fat_size, size_t img_offset, bool has_fnt){
 	if(has_fnt){
 		bStream::CMemoryStream fntBuffer = bStream::CMemoryStream(fnt_size, bStream::Endianess::Little, bStream::OpenMode::In);
 		strm.seek(fnt_offset, false);
 		strm.readBytesTo(fntBuffer.getBuffer(), fnt_size);
-		root = parseDirectory(fntBuffer, 0, "");
+		mRoot = ParseDirectory(fntBuffer, 0, "");
 	}
 
 	strm.seek(fat_offset, false);
 
-	for (size_t f = 0; f < int(fat_size / 8) - 1; f++){
+	for (size_t f = 0; f < (fat_size / 8) - 1; f++){
 		uint32_t start = strm.readUInt32();
 		uint32_t end = strm.readUInt32();
 
@@ -83,12 +85,14 @@ void NitroFS::parseRoot(bStream::CStream& strm, size_t fnt_offset, size_t fnt_si
 		strm.readBytesTo(file, end - start);
 		strm.seek(r);
 
-		files.push_back({end - start, file});
+		mFiles.push_back({end - start, file});
 	}
 
 }
 
 
-FSDir* NitroFS::getRoot(){
-	return &root;
+Directory* FileSystem::GetRoot(){
+	return &mRoot;
+}
+
 }

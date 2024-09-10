@@ -3,15 +3,15 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "../bstream/bstream.h"
-#include "NitroFS.hpp"
+#include <bstream/bstream.h>
+#include "FileSystem.hpp"
 #include <filesystem>
 #include "util.hpp"
 
-namespace Palkia {
+namespace Palkia::Nitro {
 
 #pragma pack(push,1)
-typedef struct NitroRomHeader{
+typedef struct RomHeader{
 	char romID[12];
 	char gameCode[4];
 	char makerCode[2];
@@ -54,7 +54,7 @@ typedef struct NitroRomHeader{
 
 	uint64_t secureDisable;
 	//TODO: finish this
-} NitroRomHeader;
+} RomHeader;
 
 typedef struct NitroBanner {
 	uint16_t version;
@@ -69,28 +69,25 @@ typedef struct NitroBanner {
 	char germanTitle[0x100];
 	char italianTitle[0x100];
 	char spanishTitle[0x100];
-} NitroBanner;
+} Banner;
 #pragma pack(pop)
 
 
-class NitroRom {
-	public:
-		NitroRomHeader getHeader();
-		NitroBanner getBanner();
-
-		NitroFile* getFileByPath(std::filesystem::path);
-
-		NitroRom(std::filesystem::path);
-		void getRawIcon(Color out[32][32]);
-
-		~NitroRom();
-
+class Rom {
 	private:
+		RomHeader mHeader;
+		Banner mBanner;
+		FileSystem mFS;
+	public:
+		RomHeader GetHeader();
+		Banner GetBanner();
 
-		NitroRomHeader header;
-		NitroBanner banner;
-		NitroFS fs;
+		File* GetFileByPath(std::filesystem::path);
 
+		Rom(std::filesystem::path);
+		void GetRawIcon(Color out[32][32]);
+
+		~Rom();
 };
 
 }

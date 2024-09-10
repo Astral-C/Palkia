@@ -7,9 +7,11 @@ project(palkia)
 
 #our include dir
 include_directories(include)
+include_directories(lib)
+
 file(GLOB_RECURSE LIBRARY_SOURCE
-    "bstream/*.h"
-    "bstream/*.cpp"
+    "lib/bstream/*.h"
+    "lib/bstream/*.cpp"
     "include/*.h"
     "src/*.cpp"
 )
