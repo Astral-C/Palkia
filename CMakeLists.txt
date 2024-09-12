@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 
 #oof
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fpermissive -Wall -Wformat-security")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++23 -fpermissive -Wall -Wformat-security")
 
 project(palkia)
 

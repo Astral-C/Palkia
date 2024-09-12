@@ -4,9 +4,9 @@
 #include <vector>
 #include <memory>
 #include <bstream/bstream.h>
-#include "FileSystem.hpp"
+#include "System/FileSystem.hpp"
 #include <filesystem>
-#include "util.hpp"
+#include "Util.hpp"
 
 namespace Palkia::Nitro {
 
@@ -82,7 +82,9 @@ class Rom {
 		RomHeader GetHeader();
 		Banner GetBanner();
 
-		File* GetFileByPath(std::filesystem::path);
+		std::shared_ptr<File> GetFile(std::filesystem::path);
+
+		void Dump();
 
 		Rom(std::filesystem::path);
 		void GetRawIcon(Color out[32][32]);

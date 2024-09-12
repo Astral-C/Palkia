@@ -1,5 +1,5 @@
 #pragma once
-#include "FileSystem.hpp"
+#include "System/FileSystem.hpp"
 
 namespace Palkia::Nitro {
 
@@ -9,9 +9,10 @@ private:
     FileSystem mFS;
 
 public:
+    size_t GetFileCount();
     File* GetFileByIndex(size_t index);
     void Dump();
-    Archive(bStream::CStream& stream, bool hasFNT = true);
+    Archive(bStream::CStream& stream);
     ~Archive();
 };
 

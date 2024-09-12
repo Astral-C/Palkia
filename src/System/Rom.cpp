@@ -1,5 +1,6 @@
-#include "Rom.hpp"
-#include "util.hpp"
+#include <algorithm>
+#include "System/Rom.hpp"
+#include "Util.hpp"
 
 namespace Palkia::Nitro {
 
@@ -41,7 +42,16 @@ Rom::Rom(std::filesystem::path p){
 		romFile.seek(mHeader.iconBannerOffset, false);
 		mBanner = romFile.readStruct<Banner>();
 
-		mFS.ParseRoot(romFile, mHeader.FNTOffset, mHeader.FNTSize, mHeader.FATOffset, mHeader.FATSize, 0);
+		romFile.seek(mHeader.FATOffset);
+		std::vector<std::shared_ptr<File>> files;
+		int id = 0;
+		for(auto file : mFS.ParseFAT(romFile, (mHeader.FATSize / 8) - 1)){
+			files.push_back(File::Load(romFile, id++, file.first, file.second));
+		}
+
+
+		romFile.seek(mHeader.FNTOffset);
+		mFS.mRoot = mFS.ParseFNT(romFile, mHeader.FNTSize, files);
 
 	} else {
 		std::printf("File %s not found.\n", p.filename().c_str());
@@ -49,6 +59,14 @@ Rom::Rom(std::filesystem::path p){
 }
 
 Rom::~Rom(){}
+
+void Rom::Dump(){
+	std::string name = std::string(mHeader.romID);
+	std::replace(name.begin(), name.end(), ' ', '_');
+    std::filesystem::create_directory(name);
+	mFS.GetRoot()->Dump("");
+}
+
 
 RomHeader Rom::GetHeader(){
 	return mHeader;
@@ -58,8 +76,8 @@ Banner Rom::GetBanner(){
 	return mBanner;
 }
 
-File* Rom::GetFileByPath(std::filesystem::path path){
-	return mFS.GetFileByPath(path);
+std::shared_ptr<File> Rom::GetFile(std::filesystem::path path){
+	return mFS.GetFile(path);
 }
 
 }
