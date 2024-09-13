@@ -4,13 +4,12 @@
 namespace Palkia::Nitro {
 
 void Folder::Dump(std::filesystem::path out_path){
-    for (auto& directory : mFolders){
+	for (auto& directory : mFolders){
         std::filesystem::create_directory(out_path / directory->GetName());
         directory->Dump(out_path / directory->GetName());
     }
 
     for (auto& file : mFiles){
-		std::cout << "Dumping file " << file->GetName() << std::endl; 
         bStream::CFileStream out(out_path / file->GetName(), bStream::OpenMode::Out);
         out.writeBytes(file->GetData(), file->GetSize());
     }
@@ -92,6 +91,10 @@ std::shared_ptr<Folder> FileSystem::ParseDirectory(bStream::CStream& strm, std::
 
 	dir->mFolders.shrink_to_fit();
 	dir->mFiles.shrink_to_fit();
+
+	if(dir->mFiles.size() == 0 && dir->mFolders.size() == 0){
+		return nullptr; // FNT is empty!
+	}
 
 	return dir;
 }

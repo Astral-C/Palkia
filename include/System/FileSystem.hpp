@@ -93,8 +93,10 @@ class FileSystem {
 	friend Rom;
 	friend Archive;
 private:
+	bool mHasFNT { true };
 	uint32_t mNextFileID { 0 };
 	std::shared_ptr<Folder> mRoot;
+	std::vector<std::shared_ptr<File>> mFiles; // only used when no FNT
 	std::shared_ptr<Folder> ParseDirectory(bStream::CStream& strm, std::vector<std::shared_ptr<File>>& files, uint16_t id, std::string path);
 public:
 	std::shared_ptr<Folder> GetRoot(){ return mRoot; }

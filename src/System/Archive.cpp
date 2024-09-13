@@ -4,7 +4,15 @@
 namespace Palkia::Nitro {
 
 void Archive::Dump(){
-    mFS.GetRoot()->Dump(".");
+    if(mFS.mHasFNT){
+        mFS.GetRoot()->Dump(".");
+    } else {
+        std::filesystem::create_directory("archive");
+        for (auto& file : mFS.mFiles){
+            bStream::CFileStream out(std::filesystem::path("archive") / file->GetName(), bStream::OpenMode::Out);
+            out.writeBytes(file->GetData(), file->GetSize());
+        }
+    }
 }
 
 Archive::Archive(bStream::CStream& stream){
@@ -38,6 +46,11 @@ Archive::Archive(bStream::CStream& stream){
 
     stream.seek(fntOffset);
 	mFS.mRoot = mFS.ParseFNT(stream, fntSize - 0x08, files);
+
+    if(mFS.mRoot == nullptr){ // no FNT!
+        mFS.mHasFNT = false;
+        mFS.mFiles = std::move(files);
+    }
 
 }
 
