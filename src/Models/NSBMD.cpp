@@ -2,7 +2,9 @@
 #include <Models/NSBMD.hpp>
 #include <Util.hpp>
 
-namespace Palkia::Nitro {
+namespace Palkia {
+
+
 
 void NSBMD::Load(bStream::CStream& stream){
     stream.readUInt32(); // stamp
@@ -29,7 +31,16 @@ void NSBMD::Load(bStream::CStream& stream){
             case '0LDM': {  // MDL0, why is this the wrong way????
                 uint32_t sectionSize = stream.readUInt32();
 
-                List<uint32_t> meshOffsets(stream, [](bStream::CStream& stream){ uint32_t offset = stream.readUInt32(); std::cout << "Offset?: " << offset << std::endl; return offset; });
+                Nitro::List<Mesh> meshOffsets(stream, [](bStream::CStream& stream){
+                    uint32_t offset = stream.readUInt32();
+                    size_t listPos = stream.tell();
+
+                    stream.seek(offset);
+                    // read mesh
+
+                    stream.seek(listPos);
+                });
+
 
                 break;
             }
