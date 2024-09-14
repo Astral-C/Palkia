@@ -1,7 +1,8 @@
 #include <vector>
 #include <Models/NSBMD.hpp>
+#include <Util.hpp>
 
-namespace Palkia {
+namespace Palkia::Nitro {
 
 void NSBMD::Load(bStream::CStream& stream){
     stream.readUInt32(); // stamp
@@ -21,13 +22,14 @@ void NSBMD::Load(bStream::CStream& stream){
 
         stream.seek(sectionOffset);
 
+        std::cout << "Stamp is " << stream.peekString(stream.tell(), 4) << std::endl;
         uint32_t stamp = stream.readUInt32();
-
+        
         switch (stamp){
-            case 'MDL0': {    
+            case '0LDM': {  // MDL0, why is this the wrong way????
                 uint32_t sectionSize = stream.readUInt32();
 
-                //List<Model?
+                List<uint32_t> meshOffsets(stream, [](bStream::CStream& stream){ uint32_t offset = stream.readUInt32(); std::cout << "Offset?: " << offset << std::endl; return offset; });
 
                 break;
             }
@@ -36,9 +38,9 @@ void NSBMD::Load(bStream::CStream& stream){
                 break;
         }
     
-    
-    }
+        stream.seek(returnOffset);
 
+    }
 
 }
 

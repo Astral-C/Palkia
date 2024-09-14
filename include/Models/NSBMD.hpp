@@ -1,7 +1,7 @@
 #pragma once
 #include <bstream/bstream.h>
 
-namespace Palkia {
+namespace Palkia::Nitro {
 
 class NSBMD {
 private:

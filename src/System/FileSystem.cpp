@@ -16,8 +16,51 @@ void Folder::Dump(std::filesystem::path out_path){
     
 }
 
+void Folder::ForEachFile(std::function<void(std::shared_ptr<File>)> OnFile){
+	for (auto folder : mFolders){
+		folder->ForEachFile(OnFile);
+	}
+		
+	for (auto file : mFiles){
+		OnFile(file);
+	}
+}
+
+void Folder::Traverse(std::function<void(std::shared_ptr<Folder>)> OnFolder, std::function<void(std::shared_ptr<File>)> OnFile){
+	OnFolder(GetPtr());
+	for (auto folder : mFolders){
+		folder->ForEachFile(OnFile);
+	}
+		
+	for (auto file : mFiles){
+		OnFile(file);
+	}
+}
+
 FileSystem::FileSystem(){}
 FileSystem::~FileSystem(){}
+
+void FileSystem::Traverse(std::function<void(std::shared_ptr<Folder>)> OnFolder, std::function<void(std::shared_ptr<File>)> OnFile){
+	if(!mHasFNT){
+		ForEachFile(OnFile);
+	} else {
+		mRoot->Traverse(OnFolder, OnFile);
+	}
+}
+
+void FileSystem::ForEachFile(std::function<void(std::shared_ptr<File>)> OnFile){
+	if(!mHasFNT){
+		for (auto file : mFiles){
+			OnFile(file);
+		}
+	}
+	else {
+		mRoot->ForEachFile(OnFile);
+	}
+	
+
+}
+
 
 std::shared_ptr<File> Folder::GetFile(std::filesystem::path path){
     if(path.begin() == path.end()) return nullptr;
@@ -113,5 +156,65 @@ std::vector<std::pair<uint32_t, uint32_t>> FileSystem::ParseFAT(bStream::CStream
 
 	return files;
 }
+
+void FileSystem::WriteDirectory(bStream::CStream& strm, std::shared_ptr<Folder> dir){
+	strm.writeUInt32(dir->mID);
+	if(dir->mFiles.size() > 0){
+		strm.writeUInt16(dir->mFiles[0]->GetID());
+	} else {
+		strm.writeUInt16(0); // not sure this is right behavior
+	}
+
+	for (size_t d = 0; d < dir->mFolders.size(); d++){
+		//strm.seek();
+	}
+	
+
+}
+
+
+uint32_t FileSystem::CalculateFNTSize(){
+	uint32_t fntSize = 0;
+
+	Traverse(
+		[&](std::shared_ptr<Folder> f){
+			fntSize += 9 + f->GetName().size();
+		},
+		[&](std::shared_ptr<File> f){
+			fntSize += 9 + f->GetName().size();
+		}
+	);
+
+	return fntSize;
+}
+
+void FileSystem::WriteFNT(bStream::CStream& strm){
+	if(!mHasFNT){
+		// write dummy FNT data
+		return;
+	}
+
+	// Calculate FNT Size
+
+	// Write the FNT
+
+	WriteDirectory(strm, mRoot);
+
+}
+
+uint32_t FileSystem::CalculateFATSize(){
+	uint32_t fatSize = 0;
+
+	ForEachFile([&](std::shared_ptr<File> f){
+		fatSize += 8;
+	});
+
+	return fatSize;
+}
+
+void FileSystem::WriteFAT(bStream::CStream& strm){
+
+}
+
 
 }

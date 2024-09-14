@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <bstream/bstream.h>
+#include <functional>
 
 namespace Palkia {
 
@@ -15,12 +16,15 @@ typedef union {
     uint32_t rgba; 
 } Color;
 
+namespace Nitro {
+
+typedef char Name[16];
 
 template <typename T>
 class List {
     size_t mItemCount { 0 };
-    std::string mNames[] { nullptr };
-    T mItems[] { nullptr };
+    Name* mNames { nullptr };
+    T* mItems { nullptr };
 
 public:
     List(int size){
@@ -28,37 +32,28 @@ public:
         //mNames = new std::string[size];
     }
 
-    List(bStream::CStream& stream){
-        /*
-        uint32_t offset = stream.readUInt32();
-
-        size_t cur = stream.tell();
-
-        stream.seek(offset);
-
+    List(bStream::CStream& stream, std::function<T(bStream::CStream&)> read){
         stream.skip(1); // dummy
         uint8_t count = stream.readInt8();
 
         mItems = new T[count];
-        mNames = new std::string[count];
+        mNames = new Name[count];
 
         uint16_t listSize = stream.readUInt16();
 
         stream.skip(8 + (4 * count)); // undocumented
 
         stream.readUInt16(); // size of list item in bytes
-        stream.readUInt16(); //size of data section
+        stream.readUInt16(); // size of data section
 
         for (size_t i = 0; i < count; i++){
-            mItems[i] = T(stream);
-            mNames[i] = T(stream);
+            mItems[i] = read(stream);
+            std::string name = stream.readString(16);
+            strncpy(mNames[i], name.c_str(), sizeof(mNames[i]));
         }
-        
-        */
     }
 
     ~List(){
-        /*
         if(mItems != nullptr){
             delete[] mItems;
         }
@@ -66,8 +61,9 @@ public:
         if(mNames != nullptr){
             delete[] mNames;
         }
-        */
     }
-
 };
+
+}
+
 }

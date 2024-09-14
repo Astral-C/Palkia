@@ -10,7 +10,7 @@ private:
 
 public:
     size_t GetFileCount();
-    File* GetFileByIndex(size_t index);
+    std::shared_ptr<File> GetFileByIndex(size_t index);
     void Dump();
     Archive(bStream::CStream& stream);
     ~Archive();

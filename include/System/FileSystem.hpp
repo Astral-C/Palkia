@@ -5,6 +5,7 @@
 #include <memory>
 #include <bstream/bstream.h>
 #include <filesystem>
+#include <functional>
 
 namespace Palkia::Nitro {
 
@@ -24,6 +25,7 @@ public:
 	uint8_t* GetData(){ return mData; }
 
 	void SetID(uint16_t id) { mID = id; }
+	uint16_t GetID() { return mID; }
 	void SetName(std::string name) { mName = name; }
 
 	std::string GetName() { return mName; }
@@ -82,9 +84,13 @@ public:
         return shared_from_this();
     }
 
+	void ForEachFile(std::function<void(std::shared_ptr<File>)> OnFile);
+	void Traverse(std::function<void(std::shared_ptr<Folder>)> OnFolder, std::function<void(std::shared_ptr<File>)> OnFile);
+
 	Folder(std::shared_ptr<FileSystem> fs){
 		mFileSystem = fs;
 	}
+
 	Folder(){} // this should be removed later
 	~Folder(){}
 };
@@ -98,12 +104,23 @@ private:
 	std::shared_ptr<Folder> mRoot;
 	std::vector<std::shared_ptr<File>> mFiles; // only used when no FNT
 	std::shared_ptr<Folder> ParseDirectory(bStream::CStream& strm, std::vector<std::shared_ptr<File>>& files, uint16_t id, std::string path);
+
 public:
-	std::shared_ptr<Folder> GetRoot(){ return mRoot; }
+	void Traverse(std::function<void(std::shared_ptr<Folder>)> OnFolder, std::function<void(std::shared_ptr<File>)> OnFile);
+	void ForEachFile(std::function<void(std::shared_ptr<File>)> OnFile);
+
 	std::shared_ptr<File> GetFile(std::filesystem::path);
+	std::shared_ptr<Folder> GetRoot(){ return mRoot; }
 	
 	std::vector<std::pair<uint32_t, uint32_t>> ParseFAT(bStream::CStream& strm, uint32_t entryCount);
 	std::shared_ptr<Folder> ParseFNT(bStream::CStream& strm, uint32_t fntSize, std::vector<std::shared_ptr<File>>& files);
+
+	uint32_t CalculateFNTSize();
+	uint32_t CalculateFATSize();
+
+	void WriteFNT(bStream::CStream& strm);
+	void WriteFAT(bStream::CStream& strm);
+	void WriteDirectory(bStream::CStream& strm, std::shared_ptr<Folder> mDir);
 
 	FileSystem();
 	~FileSystem();

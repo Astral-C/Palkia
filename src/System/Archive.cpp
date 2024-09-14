@@ -15,6 +15,22 @@ void Archive::Dump(){
     }
 }
 
+std::shared_ptr<File> Archive::GetFileByIndex(size_t index){
+
+    if(!mFS.mHasFNT){
+        return mFS.mFiles[index];
+    } else {
+        std::shared_ptr<File> r = nullptr;
+        mFS.ForEachFile([&](std::shared_ptr<File> f){
+            if(f->GetID() == index){
+                return;
+            }
+        });
+        return r;
+    }
+
+}
+
 Archive::Archive(bStream::CStream& stream){
     //size_t fnt_offset = stream.peekUInt32(0x14) + 0x14;
     //size_t fnt_size = stream.peekUInt32(fnt_offset); //includes header
