@@ -1,5 +1,6 @@
 #include <System/Rom.hpp>
 #include <System/Archive.hpp>
+#include <Models/NSBMD.hpp>
 #include <filesystem>
 #include <functional>
 #include "tests.h"
@@ -17,7 +18,11 @@ int main(){
 
 		Palkia::Nitro::Archive arc(buildModelArc);
 
-		arc.Dump();
+		std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(0);
+		bStream::CMemoryStream modelFile(model->GetData(), model->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
+
+		Palkia::NSBMD test;
+		test.Load(modelFile);
 
 		//Platinum.Dump();
 

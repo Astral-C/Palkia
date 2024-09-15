@@ -1,5 +1,4 @@
 #include <algorithm>
-#define BSTREAM_IMPLEMENTATION
 #include "System/Rom.hpp"
 #include "Util.hpp"
 

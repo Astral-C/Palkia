@@ -16,6 +16,11 @@ typedef union {
     uint32_t rgba; 
 } Color;
 
+template<typename T>
+float fixed(T n){
+    return (float)n / (1 << 12);
+}
+
 namespace Nitro {
 
 typedef char Name[16];
@@ -98,12 +103,9 @@ public:
     iterator begin() const { return iterator(mItems); }
     iterator end() const { return iterator(mItems + mSize); }
 
-    List(int size){
-        //mItems = new T[size];
-        //mNames = new std::string[size];
-    }
+    List(){}
 
-    List(bStream::CStream& stream, std::function<T(bStream::CStream&)> read){
+    void Load(bStream::CStream& stream, std::function<T(bStream::CStream&)> read){
         stream.skip(1); // dummy
         mSize = stream.readInt8();
 
@@ -121,6 +123,17 @@ public:
             mItems[i] = read(stream);
             std::string name = stream.readString(16);
             strncpy(mNames[i], name.c_str(), sizeof(mNames[i]));
+        }
+    }
+
+    List(const List& other){
+        mSize = other.mSize;
+        mItems = new T[mSize];
+        mNames = new Name[mSize];
+
+        for(size_t i = 0; i < mSize; i++){
+            mItems[i] = other.mItems[i];
+            strncpy(mNames[i], other.mNames[i], sizeof(mNames[i]));
         }
     }
 

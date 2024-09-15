@@ -8,6 +8,9 @@ project(palkia)
 #our include dir
 include_directories(include)
 include_directories(lib)
+include_directories(lib/glm)
+
+add_subdirectory(lib/glm)
 
 file(GLOB_RECURSE LIBRARY_SOURCE
     "lib/bstream/*.h"
