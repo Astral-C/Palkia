@@ -7,6 +7,8 @@
 namespace Palkia {
 
 namespace MDL0 {
+
+    class Mesh;
     
     typedef enum {
         Triangles,
@@ -23,16 +25,27 @@ namespace MDL0 {
         glm::vec2 texcoord;
     };
 
+    struct faceVtx {
+        uint32_t posIdx;
+        uint32_t normalIdx;
+        uint32_t texcoordIdx;
+    };
+
     class Primitive {
+    friend Mesh;
         uint32_t mVao, mVbo;
         PrimitiveType mType;
         std::vector<Vertex> mVertices {};
     public:
         void Push(Vertex v) { mVertices.push_back(v); }
 
+        void GenerateBuffers();
+
         void SetType(uint32_t t) { mType = (PrimitiveType)(t); }
         PrimitiveType GetType() { return mType; }
         std::vector<Vertex>& GetVertices() { return mVertices; }
+
+        void Render();
 
         Primitive(){}
         ~Primitive(){}
@@ -46,6 +59,8 @@ namespace MDL0 {
         std::vector<Primitive> mPrimitives {};
     public:
         std::vector<Primitive>& GetPrimitives() { return mPrimitives; }
+
+        void Render();
 
         Mesh(){}
         Mesh(bStream::CStream& stream);
@@ -63,6 +78,7 @@ namespace MDL0 {
         Nitro::List<Mesh>& GetMeshes() { return mMeshes; }
 
         void Dump();
+        void Render();
 
         Model(){}
         Model(bStream::CStream& stream);
@@ -76,6 +92,7 @@ class NSBMD {
         
 public:
     void Dump();
+    void Render(glm::mat4 v);
     void Load(bStream::CStream& stream);
     NSBMD();
     ~NSBMD();

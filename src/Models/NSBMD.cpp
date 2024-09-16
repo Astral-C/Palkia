@@ -1,16 +1,162 @@
 #include <vector>
+#include <glad/glad.h>
 #include <Models/NSBMD.hpp>
 #include <Util.hpp>
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <algorithm>
 
 namespace Palkia {
 
 namespace MDL0 {
 
+const char* default_vtx_shader_source = "#version 460\n\
+    #extension GL_ARB_separate_shader_objects : enable\n\
+    layout(location = 0) in vec3 inPosition;\n\
+    layout(location = 1) in vec3 inNormal;\n\
+    layout(location = 2) in vec3 inColor;\n\
+    layout(location = 3) in vec2 inTexCoord;\n\
+    \
+    uniform mat4 transform;\n\
+    \
+    layout(location = 0) out vec2 fragTexCoord;\n\
+    layout(location = 1) out vec3 fragVtxColor;\n\
+    \
+    void main()\n\
+    {\
+        gl_Position = transform * vec4(inPosition, 1.0);\n\
+        fragVtxColor = inColor;\n\
+        fragTexCoord = inTexCoord;\n\
+    }\
+";
+
+//uniform int pickID;\n
+const char* default_frg_shader_source = "#version 460\n\
+    #extension GL_ARB_separate_shader_objects : enable\n\
+    \
+    uniform sampler2D texSampler;\n\
+    layout(location = 0) in vec2 fragTexCoord;\n\
+    layout(location = 1) in vec3 fragVtxColor;\n\
+    \
+    layout(location = 0) out vec4 outColor;\n\
+    layout(location = 1) out int outPick;\n\
+    \
+    void main()\n\
+    {\n\
+        outColor = vec4(2.0, 2.0, 2.0, 1.0) * vec4(fragVtxColor.xyz, 1.0);\n\
+    }\
+";
+
+static uint32_t mProgram { 0xFFFFFFFF };
+
+void DestroyShaders(){
+    glDeleteProgram(mProgram);
+}
+
+void InitShaders(){
+    char glErrorLogBuffer[4096];
+    uint32_t vs = glCreateShader(GL_VERTEX_SHADER);
+    uint32_t fs = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(vs, 1, &default_vtx_shader_source, NULL);
+    glShaderSource(fs, 1, &default_frg_shader_source, NULL);
+    glCompileShader(vs);
+    uint32_t status;
+    glGetShaderiv(vs, GL_COMPILE_STATUS, &status);
+    if(status == GL_FALSE){
+        uint32_t infoLogLength;
+        glGetShaderiv(vs, GL_INFO_LOG_LENGTH, &infoLogLength);
+        glGetShaderInfoLog(vs, infoLogLength, NULL, glErrorLogBuffer);
+        printf("[NSBMD Loader]: Compile failure in mdl vertex shader:\n%s\n", glErrorLogBuffer);
+    }
+    glCompileShader(fs);
+    glGetShaderiv(fs, GL_COMPILE_STATUS, &status);
+    if(status == GL_FALSE){
+        uint32_t infoLogLength;
+        glGetShaderiv(fs, GL_INFO_LOG_LENGTH, &infoLogLength);
+        glGetShaderInfoLog(fs, infoLogLength, NULL, glErrorLogBuffer);
+        printf("[NSBMD Loader]: Compile failure in mdl fragment shader:\n%s\n", glErrorLogBuffer);
+    }
+    mProgram = glCreateProgram();
+    glAttachShader(mProgram, vs);
+    glAttachShader(mProgram, fs);
+    glLinkProgram(mProgram);
+    glGetProgramiv(mProgram, GL_LINK_STATUS, &status); 
+    if(GL_FALSE == status) {
+        uint32_t logLen; 
+        glGetProgramiv(mProgram, GL_INFO_LOG_LENGTH, &logLen); 
+        glGetProgramInfoLog(mProgram, logLen, NULL, glErrorLogBuffer); 
+        printf("[NSBMD Loader]: Shader Program Linking Error:\n%s\n", glErrorLogBuffer);
+    } 
+    glDetachShader(mProgram, vs);
+    glDetachShader(mProgram, fs);
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+}
+
 uint8_t cv5To8(uint8_t v){
     return (v << (8 - 5)) | (v >> (10 - 8));
+}
+
+void Primitive::GenerateBuffers(){
+    glGenVertexArrays(1, &mVao);
+    glBindVertexArray(mVao);
+
+    glGenBuffers(1, &mVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, mVbo);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texcoord));
+
+    glBufferData(GL_ARRAY_BUFFER, mVertices.size() * sizeof(Vertex), mVertices.data(), GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+void Primitive::Render(){
+    glBindVertexArray(mVao);
+
+    if(mType == PrimitiveType::Triangles){
+        glDrawArrays(GL_TRIANGLES, 0, mVertices.size());
+    } else if(mType == PrimitiveType::Quads){
+        glDrawArrays(GL_QUADS, 0, mVertices.size());
+    } else if(mType == PrimitiveType::Tristrips){
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, mVertices.size());
+    } else if(mType == PrimitiveType::Quadstrips){
+        glDrawArrays(GL_QUAD_STRIP, 0, mVertices.size());
+    }
+}
+
+void Mesh::Render(){
+    for(auto primitive : mPrimitives){
+        primitive.Render();
+    }
+}
+
+void Model::Render(){
+    for(auto mesh : mMeshes.GetItems()){
+        mesh.Render();
+    }
+}
+
+void NSBMD::Render(glm::mat4 v){
+    if(MDL0::mProgram == 0xFFFFFFFF){
+        MDL0::InitShaders();
+    }
+
+    glUseProgram(MDL0::mProgram);
+    glUniformMatrix4fv(glGetUniformLocation(MDL0::mProgram, "transform"), 1, 0, &v[0][0]);
+
+    for(auto model : mModels.GetItems()){
+        model.Render();
+    }
 }
 
 Mesh::Mesh(bStream::CStream& stream){
@@ -29,16 +175,18 @@ Mesh::Mesh(bStream::CStream& stream){
     std::cout << "Reading Geometry Commands at " << std::hex << pos << std::endl;
     Primitive currentPrimitive {};
     currentPrimitive.SetType(PrimitiveType::None);
+    
+    struct {
+        Vertex vtx {};
+        glm::mat4 mat {};
+    } ctx;
+
     while(stream.tell() < pos + commandsLen){
         uint8_t cmds[4] = { stream.readUInt8(), stream.readUInt8(), stream.readUInt8(), stream.readUInt8() };
 
-        struct {
-            Vertex vtx {};
-            glm::mat4 mat {};
-        } ctx;
-
-
+        std::cout << std::endl << std::endl;
         for(int c = 0; c < 4; c++){
+            std::cout << "Execing Command " << std::hex << (uint32_t)cmds[c] << std::endl;
             switch(cmds[c]){
                 case 0x40: {
                         uint32_t mode = stream.readUInt32();
@@ -50,6 +198,8 @@ Mesh::Mesh(bStream::CStream& stream){
                 
                 case 0x41:
                     std::cout << "Ending primitive with type " << std::hex << currentPrimitive.GetType() << std::endl;
+
+                    currentPrimitive.GenerateBuffers();
                     mPrimitives.push_back(currentPrimitive);
                     break;
 
@@ -57,13 +207,10 @@ Mesh::Mesh(bStream::CStream& stream){
                     uint32_t a = stream.readUInt32();
                     uint32_t b = stream.readUInt32();
                     
-                    glm::vec3 vtx;
-                    vtx.x = (float)((a & 0xFFFF) << 16 >> 16);
-                    vtx.y = (float)(((a >> 16) & 0xFFFF) << 16 >> 16);
-                    vtx.z = (float)((b & 0xFFFF) << 16 >> 16);
+                    ctx.vtx.position.x = (int16_t)(((a & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.y = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = (int16_t)(((b & 0xFFFF) << 16) >> 16) / 4096.0f;
 
-                    vtx /= 4096.0f;
-                    ctx.vtx.position = vtx;
                     currentPrimitive.Push(ctx.vtx);
                     break;
                 }
@@ -71,13 +218,10 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x24: {
                     uint32_t a = stream.readUInt32();
 
-                    glm::vec3 vtx;
-                    vtx.x = (float)((a & 0x03FF) << 22 >> 22);
-                    vtx.y = (float)(((a >> 10) & 0x03FF) << 22 >> 22);
-                    vtx.z = (float)(((a >> 20) & 0x03FF) << 22 >> 22);
+                    ctx.vtx.position.x = (int16_t)(((a & 0x03FF) << 6) >> 6) / 64.0f;
+                    ctx.vtx.position.y = (int16_t)((((a >> 10) & 0x03FF) << 6) >> 6) / 64.0f;
+                    ctx.vtx.position.z = (int16_t)((((a >> 20) & 0x03FF) << 6) >> 6) / 64.0f;
 
-                    vtx /= 64.0f;
-                    ctx.vtx.position = vtx;
                     currentPrimitive.Push(ctx.vtx);
                     break;
                 }
@@ -85,38 +229,29 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x25: {
                     uint32_t a = stream.readUInt32();
                     
-                    glm::vec3 vtx;
-                    vtx.x = (float)((a & 0xFFFF) << 16 >> 16);
-                    vtx.y = (float)(((a >> 16) & 0xFFFF) << 16 >> 16);
+                    ctx.vtx.position.x = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.y = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
 
-                    vtx /= 4096.0f;
-                    ctx.vtx.position = glm::vec3(vtx.x, vtx.y, ctx.vtx.position.z);
                     currentPrimitive.Push(ctx.vtx);
                     break;
                 }
 
                 case 0x26: {
                     uint32_t a = stream.readUInt32();
-                    
-                    glm::vec3 vtx;
-                    vtx.x = (float)((a & 0xFFFF) << 16 >> 16);
-                    vtx.z = (float)(((a >> 16) & 0xFFFF) << 16 >> 16);
 
-                    vtx /= 4096.0f;
-                    ctx.vtx.position = glm::vec3(vtx.x, ctx.vtx.position.y, vtx.z);
+                    ctx.vtx.position.x = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    
                     currentPrimitive.Push(ctx.vtx);
                     break;
                 }
 
                 case 0x27: {
                     uint32_t a = stream.readUInt32();
-                    
-                    glm::vec3 vtx;
-                    vtx.y = (float)(((a & 0xFFFF) << 16 >> 16));
-                    vtx.z = (float)((((a >> 16) & 0xFFFF) << 16 >> 16));
 
-                    vtx /= 4096.0f;
-                    ctx.vtx.position = glm::vec3(ctx.vtx.position.x, vtx.y, vtx.z);
+                    ctx.vtx.position.y = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    
                     currentPrimitive.Push(ctx.vtx);
                     break;
                 }
@@ -125,12 +260,10 @@ Mesh::Mesh(bStream::CStream& stream){
                     uint32_t a = stream.readUInt32();
 
                     glm::vec3 vtx;
-                    vtx.x = (float)((a & 0x03FF) << 22 >> 22);
-                    vtx.y = (float)(((a >> 10) & 0x03FF) << 22 >> 22);
-                    vtx.z = (float)(((a >> 20) & 0x03FF) << 22 >> 22);
+                    ctx.vtx.position.x += ((int16_t)((((a >>  0) & 0x03FF) << 22) >> 22)) / 4096.0f;
+                    ctx.vtx.position.y += ((int16_t)((((a >> 10) & 0x03FF) << 22) >> 22)) / 4096.0f;
+                    ctx.vtx.position.z += ((int16_t)((((a >> 20) & 0x03FF) << 22) >> 22)) / 4096.0f;
 
-                    vtx /= 4096.0;
-                    ctx.vtx.position += vtx;
                     currentPrimitive.Push(ctx.vtx);
                     break;
                 }
@@ -139,11 +272,10 @@ Mesh::Mesh(bStream::CStream& stream){
                     uint32_t a = stream.readUInt32();
 
                     glm::vec3 vtx;
-                    vtx.x = (float)((a & 0x03FF) << 22 >> 22);
-                    vtx.y = (float)(((a >> 10) & 0x03FF) << 22 >> 22);
-                    vtx.z = (float)(((a >> 20) & 0x03FF) << 22 >> 22);
+                    vtx.x = ((int16_t)(((a & 0x03FF) << 22) >> 22)) / 1024.0f;
+                    vtx.y = ((int16_t)((((a >> 10) & 0x03FF) << 22) >> 22)) / 1024.0f;
+                    vtx.z = ((int16_t)((((a >> 20) & 0x03FF) << 22) >> 22)) / 1024.0f;
 
-                    vtx /= 1024.0f;
                     ctx.vtx.normal = vtx;
                     break;
                 }
@@ -165,14 +297,22 @@ Mesh::Mesh(bStream::CStream& stream){
 
                     glm::vec2 tc;
 
-                    tc.x = (float)((a & 0xFFFF) << 16 >> 16) / 16.0f;
-                    tc.y = (float)((a >> 16) << 16 >> 16) / 16.0f;
+                    tc.x = (float)((int16_t)((a & 0xFFFF) << 16) >> 16) / 16.0f;
+                    tc.y = (float)((int16_t)((a >> 16) << 16) >> 16) / 16.0f;
 
                     ctx.vtx.texcoord = tc;
                     break;
                 }
 
-                case 0x14: {
+                case 0x14:{
+                    std::cout << "restore mtx" << std::endl;
+                    stream.readUInt32();
+                    break;
+                } 
+                case 0x1b: {
+                    std::cout << "scale" << std::endl;
+                    stream.readUInt32();
+                    stream.readUInt32();
                     stream.readUInt32();
                     break;
                 }
@@ -183,6 +323,7 @@ Mesh::Mesh(bStream::CStream& stream){
                 }
 
                 case 0x00:
+
                     break;
 
                 default:
@@ -301,14 +442,14 @@ void NSBMD::Load(bStream::CStream& stream){
 
 void NSBMD::Dump(){
 
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec3> normals;
+    std::vector<glm::vec2> texcoords;
+
     std::stringstream posStream;
     std::stringstream normStream;
     std::stringstream texcStream;
     std::stringstream faceStream;
-
-    int pidx = 0;
-    int nidx = 0;
-    int tcidx = 0;
 
     for(int mod = 0; mod < mModels.size(); mod++){
         auto model = mModels.GetItems()[mod];
@@ -320,103 +461,127 @@ void NSBMD::Dump(){
                 auto vertices = prim.GetVertices();
 
                 if(prim.GetType() == MDL0::Triangles){
-                    for(int v = 0; v < prim.GetVertices().size() / 3; v++){
-                        auto vtx1 = vertices[(v * 3) + 0];
-                        auto vtx2 = vertices[(v * 3) + 1];
-                        auto vtx3 = vertices[(v * 3) + 2]; 
+                    for(int v = 0; v < prim.GetVertices().size(); v+=3){
+                        std::array<MDL0::faceVtx, 3> tri;
+                        for(int i = 0; i < 3; i++){
+                            MDL0::faceVtx triVtx;
+                            auto vtx = vertices[v + i];
 
-                        posStream << "v " << vtx1.position.x << " " << vtx1.position.y << " " << vtx1.position.z << std::endl;
-                        posStream << "v " << vtx2.position.x << " " << vtx2.position.y << " " << vtx2.position.z << std::endl;
-                        posStream << "v " << vtx3.position.x << " " << vtx3.position.y << " " << vtx3.position.z << std::endl;
+                            auto pos = std::find(positions.begin(), positions.end(), vtx.position);
+                            
+                            if(pos != positions.end()){
+                                triVtx.posIdx = pos - positions.begin();
+                            } else {
+                                triVtx.posIdx = positions.size();
+                                positions.push_back(vtx.position);
+                            }
 
-                        normStream << "vn " << vtx1.normal.x << " " << vtx1.normal.y << " " << vtx1.normal.z << std::endl;
-                        normStream << "vn " << vtx2.normal.x << " " << vtx2.normal.y << " " << vtx2.normal.z << std::endl;
-                        normStream << "vn " << vtx3.normal.x << " " << vtx3.normal.y << " " << vtx3.normal.z << std::endl;
+                            auto norm = std::find(normals.begin(), normals.end(), vtx.normal);
+                            
+                            if(norm != normals.end()){
+                                triVtx.normalIdx = norm - normals.begin();
+                            } else {
+                                triVtx.normalIdx = normals.size();
+                                normals.push_back(vtx.normal);
+                            }
 
-                        texcStream << "vt " << vtx1.texcoord.x << " " << vtx1.texcoord.y << std::endl;
-                        texcStream << "vt " << vtx2.texcoord.x << " " << vtx2.texcoord.y << std::endl;
-                        texcStream << "vt " << vtx3.texcoord.x << " " << vtx3.texcoord.y << std::endl;
-
-                        faceStream << "f " << pidx   << "/" << nidx  << "/" << tcidx   << " " 
-                                           << pidx+1 << "/" << nidx+1<< "/" << tcidx+1 << " " 
-                                           << pidx+2 << "/" << nidx+2<< "/" << tcidx+2 << " " << std::endl;
-                        
-                        pidx += 3;
-                        nidx += 3;
-                        tcidx += 3;
+                            auto texco = std::find(texcoords.begin(), texcoords.end(), vtx.texcoord);
+                            
+                            if(texco != texcoords.end()){
+                                triVtx.texcoordIdx = texco - texcoords.begin();
+                            } else {
+                                triVtx.texcoordIdx = texcoords.size();
+                                texcoords.push_back(vtx.texcoord);
+                            }
+                            tri[i] = triVtx;
+                        }
+                        faceStream << "f "
+                                   << tri[0].posIdx << "/" << tri[0].texcoordIdx << "/" << tri[0].normalIdx << " "
+                                   << tri[1].posIdx << "/" << tri[1].texcoordIdx << "/" << tri[1].normalIdx << " "
+                                   << tri[2].posIdx << "/" << tri[2].texcoordIdx << "/" << tri[2].normalIdx << std::endl;
                     }
                 } else if(prim.GetType() == MDL0::Quads){
-                    for(int v = 0; v < prim.GetVertices().size() / 4; v++){
-                        auto vtx1 = vertices[(v * 4) + 0];
-                        auto vtx2 = vertices[(v * 4) + 1];
-                        auto vtx3 = vertices[(v * 4) + 2];
-                        auto vtx4 = vertices[(v * 4) + 2];
+                    for(int v = 0; v < prim.GetVertices().size(); v+=4){
+                        std::array<MDL0::faceVtx, 3> tri;
+                        for(int i = 0; i < 3; i++){
+                            MDL0::faceVtx triVtx;
+                            auto vtx = vertices[v + i];
 
-                        posStream << "v " << vtx1.position.x << " " << vtx1.position.y << " " << vtx1.position.z << std::endl;
-                        posStream << "v " << vtx2.position.x << " " << vtx2.position.y << " " << vtx2.position.z << std::endl;
-                        posStream << "v " << vtx3.position.x << " " << vtx3.position.y << " " << vtx3.position.z << std::endl;
+                            triVtx.posIdx = positions.size();
+                            positions.push_back(vtx.position);
+                            
+                            triVtx.normalIdx = normals.size();
+                            normals.push_back(vtx.normal);
 
-                        posStream << "v " << vtx2.position.x << " " << vtx2.position.y << " " << vtx2.position.z << std::endl;
-                        posStream << "v " << vtx3.position.x << " " << vtx3.position.y << " " << vtx3.position.z << std::endl;
-                        posStream << "v " << vtx4.position.x << " " << vtx4.position.y << " " << vtx4.position.z << std::endl;
+                            triVtx.texcoordIdx = texcoords.size();
+                            texcoords.push_back(vtx.texcoord);
+                            tri[i] = triVtx;
+                        }
 
-                        normStream << "vn " << vtx1.normal.x << " " << vtx1.normal.y << " " << vtx1.normal.z << std::endl;
-                        normStream << "vn " << vtx2.normal.x << " " << vtx2.normal.y << " " << vtx2.normal.z << std::endl;
-                        normStream << "vn " << vtx3.normal.x << " " << vtx3.normal.y << " " << vtx3.normal.z << std::endl;
+                        faceStream << "f "
+                                   << tri[0].posIdx << "/" << tri[0].texcoordIdx << "/" << tri[0].normalIdx << " "
+                                   << tri[1].posIdx << "/" << tri[1].texcoordIdx << "/" << tri[1].normalIdx << " "
+                                   << tri[2].posIdx << "/" << tri[2].texcoordIdx << "/" << tri[2].normalIdx << std::endl;
 
-                        normStream << "vn " << vtx2.normal.x << " " << vtx2.normal.y << " " << vtx2.normal.z << std::endl;
-                        normStream << "vn " << vtx3.normal.x << " " << vtx3.normal.y << " " << vtx3.normal.z << std::endl;
-                        normStream << "vn " << vtx4.normal.x << " " << vtx4.normal.y << " " << vtx4.normal.z << std::endl;
+                        for(int i = 2; i < 4; i++){
+                            MDL0::faceVtx triVtx;
+                            auto vtx = vertices[v + i];
 
-                        texcStream << "vt " << vtx1.texcoord.x << " " << vtx1.texcoord.y << std::endl;
-                        texcStream << "vt " << vtx2.texcoord.x << " " << vtx2.texcoord.y << std::endl;
-                        texcStream << "vt " << vtx3.texcoord.x << " " << vtx3.texcoord.y << std::endl;
+                            triVtx.posIdx = positions.size();
+                            positions.push_back(vtx.position);
+                            
+                            triVtx.normalIdx = normals.size();
+                            normals.push_back(vtx.normal);
 
-                        texcStream << "vt " << vtx2.texcoord.x << " " << vtx2.texcoord.y << std::endl;
-                        texcStream << "vt " << vtx3.texcoord.x << " " << vtx3.texcoord.y << std::endl;
-                        texcStream << "vt " << vtx4.texcoord.x << " " << vtx4.texcoord.y << std::endl;
-                        
-                        faceStream << "f " << pidx   << "/" << nidx  << "/" << tcidx   << " " 
-                                           << pidx+1 << "/" << nidx+1<< "/" << tcidx+1 << " " 
-                                           << pidx+2 << "/" << nidx+2<< "/" << tcidx+2 << " " << std::endl;
-                        
-                        faceStream << "f " << pidx+1 << "/" << nidx+1<< "/" << tcidx+1 << " " 
-                                           << pidx+2 << "/" << nidx+2<< "/" << tcidx+2 << " " 
-                                           << pidx+3 << "/" << nidx+3<< "/" << tcidx+3 << " " << std::endl;
-
-                        pidx += 4;
-                        nidx += 4;
-                        tcidx += 4;
+                            triVtx.texcoordIdx = texcoords.size();
+                            texcoords.push_back(vtx.texcoord);
+                            tri[i-1];
+                        }
+                        faceStream << "f "
+                                   << tri[0].posIdx << "/" << tri[0].texcoordIdx << "/" << tri[0].normalIdx << " "
+                                   << tri[1].posIdx << "/" << tri[1].texcoordIdx << "/" << tri[1].normalIdx << " "
+                                   << tri[2].posIdx << "/" << tri[2].texcoordIdx << "/" << tri[2].normalIdx << std::endl;
                     }
-                } else if(prim.GetType() == MDL0::Tristrips){
+                } else if(prim.GetType() == MDL0::Tristrips || prim.GetType() == MDL0::Quadstrips){
                     for(int v = 2; v < prim.GetVertices().size(); v++){
-                        auto vtx1 = vertices[v-1];
-                        auto vtx2 = vertices[(v % 2 != 0 ? v : v-1)];
-                        auto vtx3 = vertices[(v % 2 != 0 ? v-1 : v)]; 
+                        std::vector<MDL0::Vertex> verts = { vertices[v-1], vertices[(v % 2 != 0 ? v : v-1)], vertices[(v % 2 != 0 ? v-1 : v)] }; 
+                        std::array<MDL0::faceVtx, 3> tri;
 
-                        posStream << "v " << vtx1.position.x << " " << vtx1.position.y << " " << vtx1.position.z << std::endl;
-                        posStream << "v " << vtx2.position.x << " " << vtx2.position.y << " " << vtx2.position.z << std::endl;
-                        posStream << "v " << vtx3.position.x << " " << vtx3.position.y << " " << vtx3.position.z << std::endl;
+                        for(int i = 0; i < 3; i++){
+                            MDL0::faceVtx triVtx;
+                            auto vtx = verts[i];
 
-                        normStream << "vn " << vtx1.normal.x << " " << vtx1.normal.y << " " << vtx1.normal.z << std::endl;
-                        normStream << "vn " << vtx2.normal.x << " " << vtx2.normal.y << " " << vtx2.normal.z << std::endl;
-                        normStream << "vn " << vtx3.normal.x << " " << vtx3.normal.y << " " << vtx3.normal.z << std::endl;
+                            triVtx.posIdx = positions.size();
+                            positions.push_back(vtx.position);
 
-                        texcStream << "vt " << vtx1.texcoord.x << " " << vtx1.texcoord.y << std::endl;
-                        texcStream << "vt " << vtx2.texcoord.x << " " << vtx2.texcoord.y << std::endl;
-                        texcStream << "vt " << vtx3.texcoord.x << " " << vtx3.texcoord.y << std::endl;
+                            triVtx.normalIdx = normals.size();
+                            normals.push_back(vtx.normal);
 
-                        faceStream << "f " << pidx   << "/" << nidx  << "/" << tcidx   << " " 
-                                           << pidx+1 << "/" << nidx+1<< "/" << tcidx+1 << " " 
-                                           << pidx+2 << "/" << nidx+2<< "/" << tcidx+2 << " " << std::endl;
-                        
-                        pidx += 3;
-                        nidx += 3;
-                        tcidx += 3;
+                            triVtx.texcoordIdx = texcoords.size();
+                            texcoords.push_back(vtx.texcoord);
+                            tri[i] = triVtx;
+                        }
+
+                        faceStream << "f "
+                                   << tri[0].posIdx << "/" << tri[0].texcoordIdx << "/" << tri[0].normalIdx << " "
+                                   << tri[1].posIdx << "/" << tri[1].texcoordIdx << "/" << tri[1].normalIdx << " "
+                                   << tri[2].posIdx << "/" << tri[2].texcoordIdx << "/" << tri[2].normalIdx << std::endl;
                     }
                 }
             }
         }
+    }
+
+    for(auto p : positions){
+        posStream << "v " << p.x << " " << p.y << " " << p.z << std::endl;
+    }
+
+    for(auto n : normals){
+        posStream << "vn " << n.x << " " << n.y << " " << n.z << std::endl;
+    }
+
+    for(auto t : texcoords){
+        posStream << "vt " << t.x << " " << t.y << std::endl;
     }
 
     std::ofstream outObj("dump.obj");
