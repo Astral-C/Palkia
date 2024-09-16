@@ -30,10 +30,11 @@ namespace MDL0 {
     public:
         void Push(Vertex v) { mVertices.push_back(v); }
 
+        void SetType(uint32_t t) { mType = (PrimitiveType)(t); }
         PrimitiveType GetType() { return mType; }
         std::vector<Vertex>& GetVertices() { return mVertices; }
 
-        Primitive(PrimitiveType type){ mType = type; }
+        Primitive(){}
         ~Primitive(){}
     };
 

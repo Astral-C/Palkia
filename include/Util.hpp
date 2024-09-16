@@ -59,6 +59,8 @@ public:
 
         for (size_t i = 0; i < mSize; i++){
             mItems[i] = read(stream);
+        }
+        for (size_t i = 0; i < mSize; i++){
             std::string name = stream.readString(16);
             strncpy(mNames[i].data(), name.c_str(), sizeof(mNames[i]));
         }
