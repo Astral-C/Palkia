@@ -8,10 +8,33 @@ namespace Palkia {
 
 namespace MDL0 {
     
-    class Vertex {
+    typedef enum {
+        Triangles,
+        Quads,
+        Tristrips,
+        Quadstrips,
+        None
+    } PrimitiveType;
+
+    struct Vertex {
         glm::vec3 position;
         glm::vec3 normal;
-        glm::vec4 color;
+        glm::vec3 color;
+        glm::vec2 texcoord;
+    };
+
+    class Primitive {
+        uint32_t mVao, mVbo;
+        PrimitiveType mType;
+        std::vector<Vertex> mVertices {};
+    public:
+        void Push(Vertex v) { mVertices.push_back(v); }
+
+        PrimitiveType GetType() { return mType; }
+        std::vector<Vertex>& GetVertices() { return mVertices; }
+
+        Primitive(PrimitiveType type){ mType = type; }
+        ~Primitive(){}
     };
 
     class RenderCommand { };
@@ -19,11 +42,13 @@ namespace MDL0 {
     class Bone { };
 
     class Mesh {
-        std::vector<Vertex> mVertices {};
+        std::vector<Primitive> mPrimitives {};
     public:
+        std::vector<Primitive>& GetPrimitives() { return mPrimitives; }
+
         Mesh(){}
         Mesh(bStream::CStream& stream);
-2        ~Mesh(){}
+        ~Mesh(){}
     };
 
     class Model { // MDL0
@@ -33,6 +58,11 @@ namespace MDL0 {
         Nitro::List<Bone> mBones;
 
     public:
+
+        Nitro::List<Mesh>& GetMeshes() { return mMeshes; }
+
+        void Dump();
+
         Model(){}
         Model(bStream::CStream& stream);
         ~Model(){}
@@ -44,6 +74,7 @@ class NSBMD {
     Nitro::List<MDL0::Model> mModels;
         
 public:
+    void Dump();
     void Load(bStream::CStream& stream);
     NSBMD();
     ~NSBMD();

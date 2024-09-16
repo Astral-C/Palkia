@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <bstream/bstream.h>
 #include <functional>
+#include <vector>
+#include <array>
 
 namespace Palkia {
 
@@ -23,85 +25,21 @@ float fixed(T n){
 
 namespace Nitro {
 
-typedef char Name[16];
-
 template <typename T>
 class List {
     size_t mSize { 0 };
-    Name* mNames { nullptr };
-    T* mItems { nullptr };
+    std::vector<std::array<char, 16>> mNames { };
+    std::vector<T> mItems { };
 
 public:
 
-    class iterator {
-        T* ptr;
-    public:
-        using iterator_concept  = std::contiguous_iterator_tag;
-        using iterator_category = std::contiguous_iterator_tag;
-        using value_type        = T;
-        using difference_type   = std::ptrdiff_t;
-        using pointer           = T*;
-        using reference         = T&;
+    size_t size() { return mSize; }
 
-        iterator(T* p=nullptr) : ptr { p } {}
+    std::vector<T>& GetItems() { return mItems; }
+    std::vector<std::array<char, 16>>& GetNames() { return mNames; }
 
-        iterator& operator++(){
-            ptr++;
-            return *this;
-        }
-
-        iterator operator++(int){
-            auto ret = *this;
-            ptr++;
-            return ret;
-        }
-
-        iterator& operator--(){
-            ptr--;
-            return *this;
-        }
-
-        T& operator[](const size_t index) const {
-            return *(ptr + index);
-        }
-
-        const bool operator==(const iterator& o) const {
-            return ptr == o.ptr;
-        }
-
-        T& operator*() const {
-            return *ptr;
-        }
-
-        iterator operator+(const size_t n) const {
-            return iterator(ptr + n);
-        }
-
-        friend const iterator operator+(const size_t n, const iterator& o){
-            return iterator(o.ptr + n);
-        }
-
-        const iterator operator-(const size_t n){
-            return iterator(ptr - n);
-        }
-
-        const size_t operator-(const iterator& o){
-            return ptr - o.ptr;
-        }
-
-        iterator& operator+=(const size_t n) {
-            ptr += n;
-            return *this;
-        }
-
-        iterator& operator-=(const size_t n) {
-            ptr -= n;
-            return *this;
-        }
-    };
-
-    iterator begin() const { return iterator(mItems); }
-    iterator end() const { return iterator(mItems + mSize); }
+    std::vector<T>::iterator begin() const { return mItems.begin(); }
+    std::vector<T>::iterator end() const { return mItems.end(); }
 
     List(){}
 
@@ -109,10 +47,10 @@ public:
         stream.skip(1); // dummy
         mSize = stream.readInt8();
 
-        mItems = new T[mSize];
-        mNames = new Name[mSize];
+        mItems.resize(mSize);
+        mNames.resize(mSize);
 
-        uint16_t listSize = stream.readUInt16();
+        stream.readUInt16(); // list size
 
         stream.skip(8 + (4 * mSize)); // undocumented
 
@@ -122,30 +60,17 @@ public:
         for (size_t i = 0; i < mSize; i++){
             mItems[i] = read(stream);
             std::string name = stream.readString(16);
-            strncpy(mNames[i], name.c_str(), sizeof(mNames[i]));
+            strncpy(mNames[i].data(), name.c_str(), sizeof(mNames[i]));
         }
     }
 
     List(const List& other){
         mSize = other.mSize;
-        mItems = new T[mSize];
-        mNames = new Name[mSize];
-
-        for(size_t i = 0; i < mSize; i++){
-            mItems[i] = other.mItems[i];
-            strncpy(mNames[i], other.mNames[i], sizeof(mNames[i]));
-        }
+        mItems = other.mItems;
+        mNames = other.mNames;
     }
 
-    ~List(){
-        if(mItems != nullptr){
-            delete[] mItems;
-        }
-
-        if(mNames != nullptr){
-            delete[] mNames;
-        }
-    }
+    ~List(){}
 };
 
 }
