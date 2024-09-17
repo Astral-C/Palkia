@@ -206,10 +206,14 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x23: {
                     uint32_t a = stream.readUInt32();
                     uint32_t b = stream.readUInt32();
-                    
-                    ctx.vtx.position.x = (int16_t)(((a & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.y = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.z = (int16_t)(((b & 0xFFFF) << 16) >> 16) / 4096.0f;
+
+                    int16_t x = (int16_t)(a & 0xFFFF);
+                    int16_t y = (int16_t)((a >> 16) & 0xFFFF);
+                    int16_t z = (int16_t)(b & 0xFFFF);
+
+                    ctx.vtx.position.x = ((x << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.y = ((y << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = ((z << 16) >> 16) / 4096.0f;
 
                     currentPrimitive.Push(ctx.vtx);
                     break;
@@ -218,9 +222,13 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x24: {
                     uint32_t a = stream.readUInt32();
 
-                    ctx.vtx.position.x = (int16_t)(((a & 0x03FF) << 6) >> 6) / 64.0f;
-                    ctx.vtx.position.y = (int16_t)((((a >> 10) & 0x03FF) << 6) >> 6) / 64.0f;
-                    ctx.vtx.position.z = (int16_t)((((a >> 20) & 0x03FF) << 6) >> 6) / 64.0f;
+                    int16_t x = (int16_t)(a & 0x03FF);
+                    int16_t y = (int16_t)((a >> 10) & 0x03FF);
+                    int16_t z = (int16_t)((a >> 20) & 0x03FF);
+
+                    ctx.vtx.position.x = ((x << 22) >> 22) / 64.0f;
+                    ctx.vtx.position.y = ((y << 22) >> 22) / 64.0f;
+                    ctx.vtx.position.z = ((z << 22) >> 22) / 64.0f;
 
                     currentPrimitive.Push(ctx.vtx);
                     break;
@@ -228,9 +236,11 @@ Mesh::Mesh(bStream::CStream& stream){
 
                 case 0x25: {
                     uint32_t a = stream.readUInt32();
-                    
-                    ctx.vtx.position.x = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.y = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    int16_t x = (int16_t)(a & 0xFFFF);
+                    int16_t y = (int16_t)((a >> 16) & 0xFFFF);
+
+                    ctx.vtx.position.x = ((x << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.y = ((y << 16) >> 16) / 4096.0f;
 
                     currentPrimitive.Push(ctx.vtx);
                     break;
@@ -238,31 +248,38 @@ Mesh::Mesh(bStream::CStream& stream){
 
                 case 0x26: {
                     uint32_t a = stream.readUInt32();
+                    int16_t x = (int16_t)(a & 0xFFFF);
+                    int16_t z = (int16_t)((a >> 16) & 0xFFFF);
 
-                    ctx.vtx.position.x = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.z = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    
+                    ctx.vtx.position.x = ((x << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = ((z << 16) >> 16) / 4096.0f;
+
                     currentPrimitive.Push(ctx.vtx);
                     break;
                 }
 
                 case 0x27: {
                     uint32_t a = stream.readUInt32();
+                    int16_t y = (int16_t)(a & 0xFFFF);
+                    int16_t z = (int16_t)((a >> 16) & 0xFFFF);
 
-                    ctx.vtx.position.y = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.z = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    
+                    ctx.vtx.position.y = ((y << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = ((z << 16) >> 16) / 4096.0f;
+
                     currentPrimitive.Push(ctx.vtx);
-                    break;
+                    break;                
                 }
 
                 case 0x28: {
                     uint32_t a = stream.readUInt32();
 
-                    glm::vec3 vtx;
-                    ctx.vtx.position.x += ((int16_t)((((a >>  0) & 0x03FF) << 22) >> 22)) / 4096.0f;
-                    ctx.vtx.position.y += ((int16_t)((((a >> 10) & 0x03FF) << 22) >> 22)) / 4096.0f;
-                    ctx.vtx.position.z += ((int16_t)((((a >> 20) & 0x03FF) << 22) >> 22)) / 4096.0f;
+                    int16_t x = (int16_t)(a & 0x03FF);
+                    int16_t y = (int16_t)((a >> 10) & 0x03FF);
+                    int16_t z = (int16_t)((a >> 20) & 0x03FF);
+
+                    ctx.vtx.position.x += ((x << 22) >> 22) / 64.0f;
+                    ctx.vtx.position.y += ((y << 22) >> 22) / 64.0f;
+                    ctx.vtx.position.z += ((z << 22) >> 22) / 64.0f;
 
                     currentPrimitive.Push(ctx.vtx);
                     break;
@@ -271,36 +288,34 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x21: {
                     uint32_t a = stream.readUInt32();
 
-                    glm::vec3 vtx;
-                    vtx.x = ((int16_t)(((a & 0x03FF) << 22) >> 22)) / 1024.0f;
-                    vtx.y = ((int16_t)((((a >> 10) & 0x03FF) << 22) >> 22)) / 1024.0f;
-                    vtx.z = ((int16_t)((((a >> 20) & 0x03FF) << 22) >> 22)) / 1024.0f;
+                    int16_t x = (int16_t)(a & 0x03FF);
+                    int16_t y = (int16_t)((a >> 10) & 0x03FF);
+                    int16_t z = (int16_t)((a >> 20) & 0x03FF);
 
-                    ctx.vtx.normal = vtx;
+                    ctx.vtx.normal.x = ((x << 22) >> 22) / 64.0f;
+                    ctx.vtx.normal.y = ((y << 22) >> 22) / 64.0f;
+                    ctx.vtx.normal.z = ((z << 22) >> 22) / 64.0f;
                     break;
                 }
 
                 case 0x20: {
                     uint32_t a = stream.readUInt32();
 
-                    glm::vec3 vtx;
-                    vtx.b = (float)(cv5To8(a) & 0x1F) / 0xFF;
-                    vtx.g = (float)(cv5To8(a >> 5) & 0x1F) / 0xFF;
-                    vtx.r = (float)(cv5To8(a >> 10) & 0x1F) / 0xFF;
+                    ctx.vtx.color.b = cv5To8(a & 0x1F) / 0xFF;
+                    ctx.vtx.color.g = cv5To8((a >> 5) & 0x1F) / 0xFF;
+                    ctx.vtx.color.r = cv5To8((a >> 10) & 0x1F) / 0xFF;
 
-                    ctx.vtx.color = vtx;
                     break;
                 }
 
                 case 0x22: {
                     uint32_t a = stream.readUInt32();
+                    int16_t x = (int16_t)(a & 0xFFFF);
+                    int16_t y = (int16_t)((a >> 16) & 0xFFFF);
 
-                    glm::vec2 tc;
+                    ctx.vtx.texcoord.x = ((x << 16) >> 16) / 16.0f;
+                    ctx.vtx.texcoord.y = ((y << 16) >> 16) / 16.0f;
 
-                    tc.x = (float)((int16_t)((a & 0xFFFF) << 16) >> 16) / 16.0f;
-                    tc.y = (float)((int16_t)((a >> 16) << 16) >> 16) / 16.0f;
-
-                    ctx.vtx.texcoord = tc;
                     break;
                 }
 

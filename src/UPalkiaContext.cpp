@@ -28,7 +28,7 @@ UPalkiaContext::UPalkiaContext(){
 	Palkia::Nitro::Archive arc(buildModelArc);
 
 
-	std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(5); //518
+	std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(83); //518
 	bStream::CMemoryStream modelFile(model->GetData(), model->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
 
 	mCheckModel.Load(modelFile);

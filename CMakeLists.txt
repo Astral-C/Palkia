@@ -24,5 +24,5 @@ file(GLOB_RECURSE PALKIA_SOURCE
 )
 
 add_executable(palkia ${PALKIA_SOURCE})
-target_include_directories(palkia PUBLIC include lib lib/bstream lib/ImGuiFileDialog/ImGuiFileDialog  lib/glfw/include)
+target_include_directories(palkia PUBLIC include lib lib/glm lib/bstream lib/ImGuiFileDialog/ImGuiFileDialog  lib/glfw/include)
 target_link_libraries(palkia PUBLIC GL glfw imgui ImGuiFileDialog)
