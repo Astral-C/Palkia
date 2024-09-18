@@ -4,10 +4,49 @@
 #include <glm/glm.hpp>
 #include <vector>
 
+
 namespace Palkia {
 
-namespace MDL0 {
+namespace TEX0 {
+    class Palette { 
+        uint32_t mColorCount { 0 };
+        std::vector<glm::vec3> mColors;
+    public: 
+        std::vector<glm::vec3> GetColors() { return mColors; }
+        Palette(bStream::CStream&, uint32_t, uint32_t);
+        Palette(){}
+        ~Palette(){}
+    };
 
+    class Texture {
+        uint32_t mFormat;
+        uint32_t mWidth, mHeight;
+        uint32_t mColor0;
+        uint32_t mDataOffset;
+
+        std::vector<uint16_t> mImgData;
+        uint32_t mTexture { 0 };
+
+
+    public:
+    
+        uint32_t GetFormat() { return mFormat; }
+        uint32_t GetWidth() { return mWidth; }
+        uint32_t GetHeight() { return mHeight; }
+        Texture(bStream::CStream&, uint32_t);
+
+        void Convert(Palette p);
+        
+        void Bind();
+
+        Texture(){}
+        ~Texture();
+
+    };
+
+};
+
+namespace MDL0 {
     class Mesh;
     
     typedef enum {
@@ -23,12 +62,6 @@ namespace MDL0 {
         glm::vec3 normal;
         glm::vec3 color;
         glm::vec2 texcoord;
-    };
-
-    struct faceVtx {
-        uint32_t posIdx;
-        uint32_t normalIdx;
-        uint32_t texcoordIdx;
     };
 
     class Primitive {
@@ -55,21 +88,6 @@ namespace MDL0 {
     class Material { };
     class Bone { };
 
-    class Texture {
-        uint32_t mFormat;
-        uint32_t mWidth, mHeight;
-        uint32_t mColor0;
-        uint32_t mDataOffset;
-
-        std::vector<uint8_t> mImgData;
-
-    public:
-        void Convert(bStream::CStream& stream, uint32_t texDataOffset, uint32_t paletteOffset);
-        Texture(bStream::CStream&);
-        Texture(){}
-        ~Texture(){}
-
-    };
 
     class Mesh {
         std::vector<Primitive> mPrimitives {};
@@ -104,8 +122,10 @@ namespace MDL0 {
 }
 
 class NSBMD {
+    bool mReady { false };
     Nitro::List<MDL0::Model> mModels;
-    Nitro::List<MDL0::Texture> mTextures;
+    Nitro::List<TEX0::Texture> mTextures;
+    Nitro::List<TEX0::Palette> mPalettes;
         
 public:
     void Dump();
