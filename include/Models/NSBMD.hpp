@@ -55,6 +55,22 @@ namespace MDL0 {
     class Material { };
     class Bone { };
 
+    class Texture {
+        uint32_t mFormat;
+        uint32_t mWidth, mHeight;
+        uint32_t mColor0;
+        uint32_t mDataOffset;
+
+        std::vector<uint8_t> mImgData;
+
+    public:
+        void Convert(bStream::CStream& stream, uint32_t texDataOffset, uint32_t paletteOffset);
+        Texture(bStream::CStream&);
+        Texture(){}
+        ~Texture(){}
+
+    };
+
     class Mesh {
         std::vector<Primitive> mPrimitives {};
     public:
@@ -89,6 +105,7 @@ namespace MDL0 {
 
 class NSBMD {
     Nitro::List<MDL0::Model> mModels;
+    Nitro::List<MDL0::Texture> mTextures;
         
 public:
     void Dump();

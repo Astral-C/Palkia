@@ -6,6 +6,9 @@
 #include <sstream>
 #include <fstream>
 #include <algorithm>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+#include <format>
 
 namespace Palkia {
 
@@ -95,7 +98,7 @@ void InitShaders(){
 }
 
 uint8_t cv5To8(uint8_t v){
-    return (v << (8 - 5)) | (v >> (10 - 8));
+    return (v << 3) | (v >> 2);
 }
 
 void Primitive::GenerateBuffers(){
@@ -159,6 +162,49 @@ void NSBMD::Render(glm::mat4 v){
     }
 }
 
+Texture::Texture(bStream::CStream& stream){
+    uint32_t params = stream.readUInt32();
+    mFormat = (params >> 26) & 0x07;
+    mWidth = 8 << ((params >> 20) & 0x07);
+    mHeight = 8 << ((params >> 23) & 0x07);
+    mColor0 = ((params >> 29) & 0x01);
+
+    mDataOffset = (params & 0x0FFFF) << 3;
+    std::cout << "Texture format is " << std::hex << mFormat << " " << mWidth << "x" << mHeight << std::endl;
+}
+
+void Texture::Convert(bStream::CStream& stream, uint32_t texDataOffset, uint32_t paletteOffset){
+    stream.seek(texDataOffset + mDataOffset);
+    std::cout << "Reading texture at " << texDataOffset << " + " << mDataOffset << " = " << stream.tell() << std::endl;
+
+    mImgData.resize(mWidth * mHeight * 4);
+    std::fill(mImgData.begin(), mImgData.end(), 0);
+
+    //only support palette16 format for now
+    for (size_t y = 0; y < mHeight; y++){
+        for(size_t x = 0; x < mWidth; x+=4){
+            uint16_t block = stream.readUInt16();
+            for(size_t bx = 0; bx < 4; bx++){
+                uint16_t paletteIdx = block & 0x0F;
+                uint16_t readColor = stream.peekUInt16(paletteOffset + (paletteIdx * 2));
+
+                uint32_t dst = 4 * ((y * mWidth) + x + bx);
+
+                mImgData[dst] = cv5To8(readColor & 0x1F);      // r
+                mImgData[dst+1] = cv5To8((readColor >> 5) & 0x1F); // g
+                mImgData[dst+2]   =  cv5To8((readColor >> 10) & 0x1F);// b
+                mImgData[dst+3] = paletteIdx == 0 ? (mColor0 ? 0x00 : 0xFF) : 0xFF; // a
+
+                block >>= 4;
+            } 
+        }
+    }
+
+    // TODO: Upload to gpu
+
+    //stbi_write_png(std::format("tex_{}_{}.png", mWidth, mHeight).data(), mWidth, mHeight, 4, mImgData.data(), 4 * mWidth);
+}
+
 Mesh::Mesh(bStream::CStream& stream){
     size_t meshStart = stream.tell();
     std::cout << "Reading Mesh at " << std::hex << meshStart << std::endl;
@@ -206,14 +252,10 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x23: {
                     uint32_t a = stream.readUInt32();
                     uint32_t b = stream.readUInt32();
-
-                    int16_t x = (int16_t)(a & 0xFFFF);
-                    int16_t y = (int16_t)((a >> 16) & 0xFFFF);
-                    int16_t z = (int16_t)(b & 0xFFFF);
-
-                    ctx.vtx.position.x = ((x << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.y = ((y << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.z = ((z << 16) >> 16) / 4096.0f;
+                    
+                    ctx.vtx.position.x = (int16_t)(((a & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.y = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = (int16_t)(((b & 0xFFFF) << 16) >> 16) / 4096.0f;
 
                     currentPrimitive.Push(ctx.vtx);
                     break;
@@ -222,13 +264,9 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x24: {
                     uint32_t a = stream.readUInt32();
 
-                    int16_t x = (int16_t)(a & 0x03FF);
-                    int16_t y = (int16_t)((a >> 10) & 0x03FF);
-                    int16_t z = (int16_t)((a >> 20) & 0x03FF);
-
-                    ctx.vtx.position.x = ((x << 22) >> 22) / 64.0f;
-                    ctx.vtx.position.y = ((y << 22) >> 22) / 64.0f;
-                    ctx.vtx.position.z = ((z << 22) >> 22) / 64.0f;
+                    ctx.vtx.position.x = (int16_t)(((a & 0x03FF) << 6) >> 6) / 64.0f;
+                    ctx.vtx.position.y = (int16_t)((((a >> 10) & 0x03FF) << 6) >> 6) / 64.0f;
+                    ctx.vtx.position.z = (int16_t)((((a >> 20) & 0x03FF) << 6) >> 6) / 64.0f;
 
                     currentPrimitive.Push(ctx.vtx);
                     break;
@@ -236,11 +274,9 @@ Mesh::Mesh(bStream::CStream& stream){
 
                 case 0x25: {
                     uint32_t a = stream.readUInt32();
-                    int16_t x = (int16_t)(a & 0xFFFF);
-                    int16_t y = (int16_t)((a >> 16) & 0xFFFF);
-
-                    ctx.vtx.position.x = ((x << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.y = ((y << 16) >> 16) / 4096.0f;
+                    
+                    ctx.vtx.position.x = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.y = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
 
                     currentPrimitive.Push(ctx.vtx);
                     break;
@@ -248,38 +284,31 @@ Mesh::Mesh(bStream::CStream& stream){
 
                 case 0x26: {
                     uint32_t a = stream.readUInt32();
-                    int16_t x = (int16_t)(a & 0xFFFF);
-                    int16_t z = (int16_t)((a >> 16) & 0xFFFF);
 
-                    ctx.vtx.position.x = ((x << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.z = ((z << 16) >> 16) / 4096.0f;
-
+                    ctx.vtx.position.x = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    
                     currentPrimitive.Push(ctx.vtx);
                     break;
                 }
 
                 case 0x27: {
                     uint32_t a = stream.readUInt32();
-                    int16_t y = (int16_t)(a & 0xFFFF);
-                    int16_t z = (int16_t)((a >> 16) & 0xFFFF);
 
-                    ctx.vtx.position.y = ((y << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.z = ((z << 16) >> 16) / 4096.0f;
-
+                    ctx.vtx.position.y = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    
                     currentPrimitive.Push(ctx.vtx);
-                    break;                
+                    break;
                 }
 
                 case 0x28: {
                     uint32_t a = stream.readUInt32();
 
-                    int16_t x = (int16_t)(a & 0x03FF);
-                    int16_t y = (int16_t)((a >> 10) & 0x03FF);
-                    int16_t z = (int16_t)((a >> 20) & 0x03FF);
-
-                    ctx.vtx.position.x += ((x << 22) >> 22) / 64.0f;
-                    ctx.vtx.position.y += ((y << 22) >> 22) / 64.0f;
-                    ctx.vtx.position.z += ((z << 22) >> 22) / 64.0f;
+                    glm::vec3 vtx;
+                    ctx.vtx.position.x += ((int16_t)((((a >>  0) & 0x03FF) << 22) >> 22)) / 4096.0f;
+                    ctx.vtx.position.y += ((int16_t)((((a >> 10) & 0x03FF) << 22) >> 22)) / 4096.0f;
+                    ctx.vtx.position.z += ((int16_t)((((a >> 20) & 0x03FF) << 22) >> 22)) / 4096.0f;
 
                     currentPrimitive.Push(ctx.vtx);
                     break;
@@ -288,34 +317,36 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x21: {
                     uint32_t a = stream.readUInt32();
 
-                    int16_t x = (int16_t)(a & 0x03FF);
-                    int16_t y = (int16_t)((a >> 10) & 0x03FF);
-                    int16_t z = (int16_t)((a >> 20) & 0x03FF);
+                    glm::vec3 vtx;
+                    vtx.x = ((int16_t)(((a & 0x03FF) << 22) >> 22)) / 1024.0f;
+                    vtx.y = ((int16_t)((((a >> 10) & 0x03FF) << 22) >> 22)) / 1024.0f;
+                    vtx.z = ((int16_t)((((a >> 20) & 0x03FF) << 22) >> 22)) / 1024.0f;
 
-                    ctx.vtx.normal.x = ((x << 22) >> 22) / 64.0f;
-                    ctx.vtx.normal.y = ((y << 22) >> 22) / 64.0f;
-                    ctx.vtx.normal.z = ((z << 22) >> 22) / 64.0f;
+                    ctx.vtx.normal = vtx;
                     break;
                 }
 
                 case 0x20: {
                     uint32_t a = stream.readUInt32();
 
-                    ctx.vtx.color.b = cv5To8(a & 0x1F) / 0xFF;
-                    ctx.vtx.color.g = cv5To8((a >> 5) & 0x1F) / 0xFF;
-                    ctx.vtx.color.r = cv5To8((a >> 10) & 0x1F) / 0xFF;
+                    glm::vec3 vtx;
+                    vtx.b = (float)(cv5To8(a) & 0x1F) / 0xFF;
+                    vtx.g = (float)(cv5To8(a >> 5) & 0x1F) / 0xFF;
+                    vtx.r = (float)(cv5To8(a >> 10) & 0x1F) / 0xFF;
 
+                    ctx.vtx.color = vtx;
                     break;
                 }
 
                 case 0x22: {
                     uint32_t a = stream.readUInt32();
-                    int16_t x = (int16_t)(a & 0xFFFF);
-                    int16_t y = (int16_t)((a >> 16) & 0xFFFF);
 
-                    ctx.vtx.texcoord.x = ((x << 16) >> 16) / 16.0f;
-                    ctx.vtx.texcoord.y = ((y << 16) >> 16) / 16.0f;
+                    glm::vec2 tc;
 
+                    tc.x = (float)((int16_t)((a & 0xFFFF) << 16) >> 16) / 16.0f;
+                    tc.y = (float)((int16_t)((a >> 16) << 16) >> 16) / 16.0f;
+
+                    ctx.vtx.texcoord = tc;
                     break;
                 }
 
@@ -441,13 +472,55 @@ void NSBMD::Load(bStream::CStream& stream){
                     return model;
                 });
 
+                break;
+            }
 
+            case 0x30584554: { // TEX0 
+                stream.readUInt32(); // section size 0x04
+                stream.skip(4); //0x08
+
+                uint16_t textureDataSize = stream.readUInt16(); //0x0C
+                uint16_t textureListOffset = stream.readUInt16(); //0x0E
+                stream.skip(4);
+                uint32_t textureDataOffset = stream.readUInt32(); //0x14
+                stream.skip(4); //padding //0x18
+
+                uint16_t cmpTexDataSize = stream.readUInt16() << 3; //0x1C
+                uint32_t cmpTexInfoOffset = stream.readUInt16(); // 0x1E
+                stream.skip(4); // padding 0x20
+                
+                uint32_t cmpTexDataOffset = stream.readUInt32(); //0x24
+                uint32_t cmpTexInfoDataOffset = stream.readUInt32(); // 0x28 huh?
+                stream.skip(4); // 0x2C
+
+                uint32_t paletteDataSize = stream.readUInt32(); //30
+                uint32_t paletteDictOffset = stream.readUInt16(); //34
+                stream.skip(2);
+                uint32_t paletteDataOffset = stream.readUInt32(); //
+
+                Nitro::List<uint32_t> palettes;
+
+                stream.seek(sectionOffset + paletteDictOffset);
+                palettes.Load(stream, [&](bStream::CStream& stream){
+                    uint32_t paletteOffset = (stream.readUInt16() << 3) + paletteDataOffset + sectionOffset;
+                    return paletteOffset;
+                });
+
+                stream.seek(sectionOffset + textureListOffset);
+                std::cout << "Reading Texture List at " << std::hex << sectionOffset << " " << textureListOffset << std::endl;
+                mTextures.Load(stream, [&](bStream::CStream& stream){
+                    MDL0::Texture texture(stream);
+                    texture.Convert(stream, textureDataOffset + sectionOffset, palettes.GetItems()[0]);
+
+                    return  texture;
+                });
                 break;
             }
 
             default:
                 break;
         }
+    
     
         stream.seek(returnOffset);
 
