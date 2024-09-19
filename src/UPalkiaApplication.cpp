@@ -11,7 +11,9 @@
 #include <string>
 #include <iostream>
 
-void DealWithGLErrors(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {}
+void DealWithGLErrors(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
+	//std::cout << message << std::endl;
+}
 
 static UPalkiaContext* ResizeContext = nullptr;
 
@@ -35,7 +37,7 @@ bool UPalkiaApplication::Setup() {
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 	glfwWindowHint(GLFW_DEPTH_BITS, 32);
 	glfwWindowHint(GLFW_SAMPLES, 4);
@@ -58,6 +60,10 @@ bool UPalkiaApplication::Setup() {
 	gladLoadGL(glfwGetProcAddress);
 	glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 	glfwSwapInterval(1);
+
+
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback(DealWithGLErrors, nullptr);
 
 	// Initialize imgui
 	ImGui::CreateContext();

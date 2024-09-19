@@ -17,22 +17,19 @@
 #include "IconsForkAwesome.h"
 
 
-UPalkiaContext::~UPalkiaContext(){ }
+UPalkiaContext::~UPalkiaContext(){
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+	glDeleteFramebuffers(1, &mFbo);
+	glDeleteRenderbuffers(1, &mRbo);
+	glDeleteTextures(1, &mViewTex);
+	glDeleteTextures(1, &mPickTex);
+}
 
 UPalkiaContext::UPalkiaContext(){
 
 	//Palkia::Nitro::Rom Platinum(std::filesystem::path("platinum.nds"));
-		
-	bStream::CFileStream buildModelArc("build_model.narc");
-
-	Palkia::Nitro::Archive arc(buildModelArc);
-
-
-	std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(5); //518
-	bStream::CMemoryStream modelFile(model->GetData(), model->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
-
-	mCheckModel.Load(modelFile);
-	mCheckModel.Dump();
 
 	ImGuiIO& io = ImGui::GetIO();
 	
@@ -111,7 +108,6 @@ void UPalkiaContext::Render(float deltaTime) {
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-
 		ImGui::DockBuilderRemoveNode(mMainDockSpaceID); // clear any previous layout
 		ImGui::DockBuilderAddNode(mMainDockSpaceID, dockFlags | ImGuiDockNodeFlags_DockSpace);
 		ImGui::DockBuilderSetNodeSize(mMainDockSpaceID, mainViewport->Size);
@@ -136,6 +132,16 @@ void UPalkiaContext::Render(float deltaTime) {
 	ImGui::Begin("mainWindow", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 	ImGui::Text("Map");
 		ImGui::Separator();
+		if(ImGui::Button("Load")){
+			bStream::CFileStream buildModelArc("build_model.narc");
+			Palkia::Nitro::Archive arc(buildModelArc);
+
+
+			std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(76); //518
+			bStream::CMemoryStream modelFile(model->GetData(), model->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
+
+			mCheckModel.Load(modelFile);
+		}
 	ImGui::End();
 
 	ImGui::SetNextWindowClass(&mainWindowOverride);
@@ -177,17 +183,15 @@ void UPalkiaContext::Render(float deltaTime) {
 
 			GLenum attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 			glDrawBuffers(2, attachments);
-		
 		}
 		
 		glViewport(0, 0, (uint32_t)winSize.x, (uint32_t)winSize.y);
-
-		
 		glClearColor(0.100f, 0.261f, 0.402f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+
 		int32_t unused = 0;
-		//glClearTexImage(mPickTex, 0, GL_RED_INTEGER, GL_INT, &unused);
+		glClearTexImage(mPickTex, 0, GL_RED_INTEGER, GL_INT, &unused);
 
 		mPrevWinWidth = winSize.x;
 		mPrevWinHeight = winSize.y;

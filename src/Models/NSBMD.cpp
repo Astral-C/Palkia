@@ -12,6 +12,10 @@
 
 namespace Palkia {
 
+uint8_t cv3To8(uint8_t v){
+    return (v << 5) | (v << 2) | (v >> 1);
+}
+
 uint8_t cv5To8(uint8_t v){
     return (v << 3) | (v >> 2);
 }
@@ -68,10 +72,10 @@ void InitShaders(){
     glShaderSource(vs, 1, &default_vtx_shader_source, NULL);
     glShaderSource(fs, 1, &default_frg_shader_source, NULL);
     glCompileShader(vs);
-    uint32_t status;
+    int32_t status;
     glGetShaderiv(vs, GL_COMPILE_STATUS, &status);
     if(status == GL_FALSE){
-        uint32_t infoLogLength;
+        int32_t infoLogLength;
         glGetShaderiv(vs, GL_INFO_LOG_LENGTH, &infoLogLength);
         glGetShaderInfoLog(vs, infoLogLength, NULL, glErrorLogBuffer);
         printf("[NSBMD Loader]: Compile failure in mdl vertex shader:\n%s\n", glErrorLogBuffer);
@@ -79,7 +83,7 @@ void InitShaders(){
     glCompileShader(fs);
     glGetShaderiv(fs, GL_COMPILE_STATUS, &status);
     if(status == GL_FALSE){
-        uint32_t infoLogLength;
+        int32_t infoLogLength;
         glGetShaderiv(fs, GL_INFO_LOG_LENGTH, &infoLogLength);
         glGetShaderInfoLog(fs, infoLogLength, NULL, glErrorLogBuffer);
         printf("[NSBMD Loader]: Compile failure in mdl fragment shader:\n%s\n", glErrorLogBuffer);
@@ -90,7 +94,7 @@ void InitShaders(){
     glLinkProgram(mProgram);
     glGetProgramiv(mProgram, GL_LINK_STATUS, &status); 
     if(GL_FALSE == status) {
-        uint32_t logLen; 
+        int32_t logLen; 
         glGetProgramiv(mProgram, GL_INFO_LOG_LENGTH, &logLen); 
         glGetProgramInfoLog(mProgram, logLen, NULL, glErrorLogBuffer); 
         printf("[NSBMD Loader]: Shader Program Linking Error:\n%s\n", glErrorLogBuffer);
@@ -104,25 +108,29 @@ void InitShaders(){
 namespace MDL0 {
 
 void Primitive::GenerateBuffers(){
-    glGenVertexArrays(1, &mVao);
-    glBindVertexArray(mVao);
 
-    glGenBuffers(1, &mVbo);
-    glBindBuffer(GL_ARRAY_BUFFER, mVbo);
+    glCreateBuffers(1, &mVbo);
+    glNamedBufferStorage(mVbo, sizeof(Vertex)*mVertices.size(), mVertices.data(), GL_DYNAMIC_STORAGE_BIT);
 
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texcoord));
+    glCreateVertexArrays(1, &mVao);
 
-    glBufferData(GL_ARRAY_BUFFER, mVertices.size() * sizeof(Vertex), mVertices.data(), GL_STATIC_DRAW);
+    glVertexArrayVertexBuffer(mVao, 0, mVbo, 0, sizeof(Vertex));
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    glEnableVertexArrayAttrib(mVao, 0);
+    glEnableVertexArrayAttrib(mVao, 1);
+    glEnableVertexArrayAttrib(mVao, 2);
+    glEnableVertexArrayAttrib(mVao, 3);
+
+    glVertexArrayAttribFormat(mVao, 0, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, position));
+    glVertexArrayAttribFormat(mVao, 1, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, normal));
+    glVertexArrayAttribFormat(mVao, 2, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, color));
+    glVertexArrayAttribFormat(mVao, 3, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, texcoord));
+
+    glVertexArrayAttribBinding(mVao, 0, 0);
+    glVertexArrayAttribBinding(mVao, 1, 0);
+    glVertexArrayAttribBinding(mVao, 2, 0);
+    glVertexArrayAttribBinding(mVao, 3, 0);
+
 }
 
 void Primitive::Render(){
@@ -135,20 +143,25 @@ void Primitive::Render(){
     } else if(mType == PrimitiveType::Tristrips){
         glDrawArrays(GL_TRIANGLE_STRIP, 0, mVertices.size());
     } else if(mType == PrimitiveType::Quadstrips){
-        glDrawArrays(GL_QUAD_STRIP, 0, mVertices.size());
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, mVertices.size());
     }
+}
+
+Primitive::~Primitive(){
+    glDeleteVertexArrays(1, &mVao);
+    glDeleteBuffers(1, &mVbo);
 }
 
 void Mesh::Render(){
     for(auto primitive : mPrimitives){
-        primitive.Render();
+        primitive->Render();
     }
 }
 
 void Model::Render(){
     // render based on render commands
-    for(auto [name, mesh] : mMeshes.GetItems()){
-        mesh.Render();
+    for(auto [name, mesh] : mMeshes){
+        mesh->Render();
     }
 }
 
@@ -166,8 +179,8 @@ Mesh::Mesh(bStream::CStream& stream){
 
     size_t pos = stream.tell();
     std::cout << "Reading Geometry Commands at " << std::hex << pos << std::endl;
-    Primitive currentPrimitive {};
-    currentPrimitive.SetType(PrimitiveType::None);
+    std::shared_ptr<Primitive> currentPrimitive = std::make_shared<Primitive>();
+    currentPrimitive->SetType(PrimitiveType::None);
     
     struct {
         Vertex vtx {};
@@ -181,13 +194,13 @@ Mesh::Mesh(bStream::CStream& stream){
             switch(cmds[c]){
                 case 0x40: {
                         uint32_t mode = stream.readUInt32();
-                        currentPrimitive = {};
-                        currentPrimitive.SetType(mode);
+                        currentPrimitive = std::make_shared<Primitive>();
+                        currentPrimitive->SetType(mode);
                     }
                     break;
                 
                 case 0x41:
-                    currentPrimitive.GenerateBuffers();
+                    currentPrimitive->GenerateBuffers();
                     mPrimitives.push_back(currentPrimitive);
                     break;
 
@@ -199,7 +212,7 @@ Mesh::Mesh(bStream::CStream& stream){
                     ctx.vtx.position.y = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
                     ctx.vtx.position.z = (int16_t)(((b & 0xFFFF) << 16) >> 16) / 4096.0f;
 
-                    currentPrimitive.Push(ctx.vtx);
+                    currentPrimitive->Push(ctx.vtx);
                     break;
                 }
 
@@ -210,7 +223,7 @@ Mesh::Mesh(bStream::CStream& stream){
                     ctx.vtx.position.y = (int16_t)((((a >> 10) & 0x03FF) << 6) >> 6) / 64.0f;
                     ctx.vtx.position.z = (int16_t)((((a >> 20) & 0x03FF) << 6) >> 6) / 64.0f;
 
-                    currentPrimitive.Push(ctx.vtx);
+                    currentPrimitive->Push(ctx.vtx);
                     break;
                 }
 
@@ -220,7 +233,7 @@ Mesh::Mesh(bStream::CStream& stream){
                     ctx.vtx.position.x = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
                     ctx.vtx.position.y = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
 
-                    currentPrimitive.Push(ctx.vtx);
+                    currentPrimitive->Push(ctx.vtx);
                     break;
                 }
 
@@ -230,7 +243,7 @@ Mesh::Mesh(bStream::CStream& stream){
                     ctx.vtx.position.x = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
                     ctx.vtx.position.z = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
                     
-                    currentPrimitive.Push(ctx.vtx);
+                    currentPrimitive->Push(ctx.vtx);
                     break;
                 }
 
@@ -240,19 +253,18 @@ Mesh::Mesh(bStream::CStream& stream){
                     ctx.vtx.position.y = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
                     ctx.vtx.position.z = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
                     
-                    currentPrimitive.Push(ctx.vtx);
+                    currentPrimitive->Push(ctx.vtx);
                     break;
                 }
 
                 case 0x28: {
                     uint32_t a = stream.readUInt32();
 
-                    glm::vec3 vtx;
                     ctx.vtx.position.x += ((int16_t)((((a >>  0) & 0x03FF) << 22) >> 22)) / 4096.0f;
                     ctx.vtx.position.y += ((int16_t)((((a >> 10) & 0x03FF) << 22) >> 22)) / 4096.0f;
                     ctx.vtx.position.z += ((int16_t)((((a >> 20) & 0x03FF) << 22) >> 22)) / 4096.0f;
 
-                    currentPrimitive.Push(ctx.vtx);
+                    currentPrimitive->Push(ctx.vtx);
                     break;
                 }
 
@@ -283,12 +295,12 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x22: {
                     uint32_t a = stream.readUInt32();
 
-                    glm::vec2 tc;
+                    int16_t s = ((a & 0xFFFF) << 16) >> 16;
+                    int16_t t = (((a >> 16) & 0xFFFF) << 16) >> 16;
 
-                    tc.x = (float)((int16_t)((a & 0xFFFF) << 16) >> 16) / 16.0f;
-                    tc.y = (float)((int16_t)((a >> 16) << 16) >> 16) / 16.0f;
+                    ctx.vtx.texcoord.x = s / 16.0f;
+                    ctx.vtx.texcoord.y = t / 16.0f;
 
-                    ctx.vtx.texcoord = tc;
                     break;
                 }
 
@@ -359,16 +371,16 @@ Model::Model(bStream::CStream& stream){
 
     stream.seek(meshesOffset + modelOffset);
     std::cout << "Reading mesh list at " << std::hex << stream.tell() << std::endl;
-    mMeshes.Load(stream, [&](bStream::CStream& stream){
+    mMeshes = Nitro::ReadList<std::shared_ptr<Mesh>>(stream, [&](bStream::CStream& stream){
         uint32_t offset = stream.readUInt32();
         size_t listPos = stream.tell();
 
         stream.seek(offset + meshesOffset + modelOffset);
 
-        Mesh mesh(stream);
+        std::shared_ptr<Mesh> mesh = std::make_shared<Mesh>(stream);
 
         stream.seek(listPos);
-        return std::move(mesh);
+        return mesh;
     });
 
 }
@@ -394,23 +406,59 @@ Texture::Texture(bStream::CStream& stream, uint32_t texDataOffset){
     mImgData.resize(mWidth * mHeight);
     std::fill(mImgData.begin(), mImgData.end(), 0);
 
-    //only support palette16 format for now
-    for (size_t y = 0; y < mHeight; y++){
-        for(size_t x = 0; x < mWidth; x+=4){
-            uint16_t block = stream.readUInt16();
-            for(size_t bx = 0; bx < 4; bx++){
-                uint16_t paletteIdx = block & 0x0F;
-                uint32_t dst = ((y * mWidth) + x + bx);
-                mImgData[dst] = paletteIdx;
-                block >>= 4;
-            } 
+    if(mFormat == 0x03){
+        for (size_t y = 0; y < mHeight; y++){
+            for(size_t x = 0; x < mWidth; x+=4){
+                uint16_t block = stream.readUInt16();
+                for(size_t bx = 0; bx < 4; bx++){
+                    uint16_t paletteIdx = block & 0x0F;
+                    uint32_t dst = ((y * mWidth) + x + bx);
+                    mImgData[dst] = paletteIdx;
+                    block >>= 4;
+                } 
+            }
+        }
+    } else if(mFormat == 0x02){
+        for (size_t y = 0; y < mHeight; y++){
+            for(size_t x = 0; x < mWidth; x+=8){
+                uint16_t block = stream.readUInt16();
+                for(size_t bx = 0; bx < 4; bx++){
+                    uint16_t paletteIdx = block & 0x03;
+                    uint32_t dst = ((y * mWidth) + x + bx);
+                    mImgData[dst] = paletteIdx;
+                    block >>= 2;
+                } 
+            }
+        }
+    } else if(mFormat == 0x02){
+        for (size_t y = 0; y < mHeight; y++){
+            for(size_t x = 0; x < mWidth; x++){
+                uint32_t dst = ((y * mWidth) + x);
+                
+                uint16_t block = stream.readUInt8();
+
+                uint16_t paletteIdx = (block & 0x1F) << 1;
+                uint16_t alpha = cv3To8(block >> 5);
+                
+                mImgData[dst] = (paletteIdx << 16) | alpha;
+            }
         }
     }
 
     stream.seek(pos);
 }
 
+static int v = 0;
+
 void Texture::Convert(Palette p){
+    glGenTextures(1, &mTexture);
+    glBindTexture(GL_TEXTURE_2D, mTexture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
     std::vector<uint8_t> image;
     image.resize(mWidth * mHeight * 4);
 
@@ -418,29 +466,31 @@ void Texture::Convert(Palette p){
         for(size_t x = 0; x < mWidth; x++){
             uint32_t src = ((y * mWidth) + x);
             uint32_t dst = ((y * mWidth) + x) * 4;
-            image[dst]   = p.GetColors()[mImgData[src]].r;
-            image[dst+1] = p.GetColors()[mImgData[src]].g;
-            image[dst+2] = p.GetColors()[mImgData[src]].b;
-            image[dst+3] = mImgData[src] == 0 ? (mColor0 ? 0x00 : 0xFF) : 0xFF; 
+            if(mFormat == 0x03 || mFormat == 0x02){
+                image[dst]   = p.GetColors()[mImgData[src]].r;
+                image[dst+1] = p.GetColors()[mImgData[src]].g;
+                image[dst+2] = p.GetColors()[mImgData[src]].b;
+                image[dst+3] = mImgData[src] == 0 ? (mColor0 ? 0x00 : 0xFF) : 0xFF;
+            } else if(mFormat == 0x01){
+                image[dst]   = p.GetColors()[mImgData[src] >> 16].r;
+                image[dst+1] = p.GetColors()[mImgData[src] >> 16].g;
+                image[dst+2] = p.GetColors()[mImgData[src] >> 16].b;
+                image[dst+3] = mImgData[src] & 0x0000FFFF;
+            }
         }
     }
 
-    glGenTextures(1, &mTexture);
-    glBindTexture(GL_TEXTURE_2D, mTexture);
-
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, mWidth, mHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    std::cout << "value of texture is " << mTexture << std::endl;
+
+    stbi_write_png(std::format("{}.png", v++).c_str(), mWidth, mHeight, 4, image.data(), 4*mWidth);
 
 }
 
 void Texture::Bind(){
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE0, mTexture);
+    glBindTextureUnit(0, mTexture);
 }
 
 Texture::~Texture(){
@@ -459,7 +509,7 @@ Palette::Palette(bStream::CStream& stream, uint32_t paletteDataOffset, uint32_t 
         nextPaletteOffset = (stream.peekUInt16(tempPos+=2) << 3) + paletteDataOffset;
     }
 
-    if(nextPaletteOffset > paletteDataOffset + paletteDataSize){
+    if(nextPaletteOffset > paletteDataOffset + paletteDataSize || nextPaletteOffset < paletteOffset){
         nextPaletteOffset = paletteDataOffset + paletteDataSize;
     }
 
@@ -492,9 +542,11 @@ void NSBMD::Render(glm::mat4 v){
         glUseProgram(mProgram);
         glUniformMatrix4fv(glGetUniformLocation(mProgram, "transform"), 1, 0, &v[0][0]);
 
-        for(auto [modelName, model] : mModels.GetItems()){
-            mTextures.GetItems()["fsloof"].Bind();
-            model.Render();
+        for(auto [modelName, model] : mModels){
+            for(auto [name, mesh] : model->GetMeshes()){
+                mTextures.begin()->second->Bind();
+                mesh->Render();
+            }
         }
     }
 }
@@ -523,16 +575,16 @@ void NSBMD::Load(bStream::CStream& stream){
             case 0x304C444D: {  // MDL0, why is this the wrong way???? '0LDM'
                 stream.readUInt32(); // section size
                 std::cout << "Reading model list at " << std::hex << stream.tell() << std::endl;
-                mModels.Load(stream, [&](bStream::CStream& stream){
+                mModels = Nitro::ReadList<std::shared_ptr<MDL0::Model>>(stream, [&](bStream::CStream& stream){
                     uint32_t offset = stream.readUInt32();
                     size_t listPos = stream.tell();
 
                     stream.seek(sectionOffset + offset);
 
-                    MDL0::Model model(stream);
+                    std::shared_ptr<MDL0::Model> model = std::make_shared<MDL0::Model>(stream);
 
                     stream.seek(listPos);
-                    return std::move(model);
+                    return model;
                 });
 
                 break;
@@ -562,24 +614,19 @@ void NSBMD::Load(bStream::CStream& stream){
                 uint32_t paletteDataOffset = stream.readUInt32(); //
 
                 stream.seek(sectionOffset + paletteDictOffset);
-                mPalettes.Load(stream, [&](bStream::CStream& stream){
-                    TEX0::Palette palette(stream, paletteDataOffset + sectionOffset, paletteDataSize);
+                mPalettes = Nitro::ReadList<std::shared_ptr<TEX0::Palette>>(stream, [&](bStream::CStream& stream){
+                    std::shared_ptr<TEX0::Palette> palette = std::make_shared<TEX0::Palette>(stream, paletteDataOffset + sectionOffset, paletteDataSize);
                     return palette;
                 });
 
                 stream.seek(sectionOffset + textureListOffset);
                 std::cout << "Reading Texture List at " << std::hex << sectionOffset << " " << textureListOffset << std::endl;
-                mTextures.Load(stream, [&](bStream::CStream& stream){
-                    TEX0::Texture texture(stream, textureDataOffset + sectionOffset);
+                mTextures = Nitro::ReadList<std::shared_ptr<TEX0::Texture>>(stream, [&](bStream::CStream& stream){
+                    std::shared_ptr<TEX0::Texture> texture = std::make_shared<TEX0::Texture>(stream, textureDataOffset + sectionOffset);
                     stream.readUInt32(); // wuh?
-                    return std::move(texture);
+                    return texture;
                 });
-
-                for(auto [texname, texture] : mTextures.GetItems()){
-                    if(mPalettes.GetItems().count(texname) != 0){
-                        texture.Convert(mPalettes.GetItems()[texname]);
-                    }
-                }
+                
 
                 break;   
             }
@@ -591,6 +638,15 @@ void NSBMD::Load(bStream::CStream& stream){
     
         stream.seek(returnOffset);
 
+    }
+
+    auto texPairs = mTextures.begin();
+    auto palPairs = mPalettes.begin();
+
+    for (size_t i = 0; i < mTextures.size(); i++){
+        texPairs->second->Convert(*palPairs->second);
+        palPairs++;
+        texPairs++;
     }
 
     mReady = true;

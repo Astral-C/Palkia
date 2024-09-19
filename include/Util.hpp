@@ -26,48 +26,33 @@ float fixed(T n){
 namespace Nitro {
 
 template <typename T>
-class List {
-    size_t mSize { 0 };
-    std::map<std::string, T> mItems;
+std::map<std::string, T> ReadList(bStream::CStream& stream, std::function<T(bStream::CStream&)> read){
+    size_t size = 0;
+    stream.skip(1); // dummy
 
-public:
+    size = stream.readInt8();
 
-    size_t size() { return mSize; }
+    std::vector<T> tempItems;
+    std::map<std::string, T> items;
 
-    List(){}
+    tempItems.resize(size);
+    stream.readUInt16(); // list size
 
-    std::map<std::string, T>& GetItems() { return mItems; }
+    stream.skip(8 + (4 * size)); // undocumented
 
-    void Load(bStream::CStream& stream, std::function<T(bStream::CStream&)> read){
-        stream.skip(1); // dummy
-        mSize = stream.readInt8();
+    stream.readUInt16(); // size of list item in bytes
+    stream.readUInt16(); // size of data section
 
-        std::vector<T> tempItems;
-        tempItems.resize(mSize);
-
-        stream.readUInt16(); // list size
-
-        stream.skip(8 + (4 * mSize)); // undocumented
-
-        stream.readUInt16(); // size of list item in bytes
-        stream.readUInt16(); // size of data section
-
-        for (size_t i = 0; i < mSize; i++){
-            tempItems[i] = read(stream);
-        }
-        for (size_t i = 0; i < mSize; i++){
-            std::string name = stream.readString(16);
-            mItems[name] = tempItems[i];
-        }
+    for (size_t i = 0; i < size; i++){
+        tempItems[i] = read(stream);
+    }
+    for (size_t i = 0; i < size; i++){
+        std::string name = stream.readString(16);
+        items[name] = tempItems[i];
     }
 
-    List(const List& other){
-        mSize = other.mSize;
-        mItems = other.mItems;
-    }
-
-    ~List(){}
-};
+    return items;
+}
 
 }
 

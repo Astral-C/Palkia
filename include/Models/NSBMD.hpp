@@ -3,7 +3,7 @@
 #include <bstream/bstream.h>
 #include <glm/glm.hpp>
 #include <vector>
-
+#include <memory>
 
 namespace Palkia {
 
@@ -24,7 +24,7 @@ namespace TEX0 {
         uint32_t mColor0;
         uint32_t mDataOffset;
 
-        std::vector<uint16_t> mImgData;
+        std::vector<uint32_t> mImgData;
         uint32_t mTexture { 0 };
 
 
@@ -81,18 +81,20 @@ namespace MDL0 {
         void Render();
 
         Primitive(){}
-        ~Primitive(){}
+        ~Primitive();
     };
 
     class RenderCommand { };
-    class Material { };
     class Bone { };
 
+    class Material { 
+        uint32_t mDiffAmb, mSpeEmi, mPolygonAttr, mTexImgParams; // texwidth/height are duplicates?
+    };
 
     class Mesh {
-        std::vector<Primitive> mPrimitives {};
+        std::vector<std::shared_ptr<Primitive>> mPrimitives {};
     public:
-        std::vector<Primitive>& GetPrimitives() { return mPrimitives; }
+        std::vector<std::shared_ptr<Primitive>>& GetPrimitives() { return mPrimitives; }
 
         void Render();
 
@@ -102,14 +104,14 @@ namespace MDL0 {
     };
 
     class Model { // MDL0
-        Nitro::List<RenderCommand> mRenderCommands;
-        Nitro::List<Material> mMaterials;
-        Nitro::List<Mesh> mMeshes;
-        Nitro::List<Bone> mBones;
+        std::map<std::string, std::shared_ptr<RenderCommand>> mRenderCommands;
+        std::map<std::string, std::shared_ptr<Material>> mMaterials;
+        std::map<std::string, std::shared_ptr<Mesh>> mMeshes;
+        std::map<std::string, std::shared_ptr<Bone>> mBones;
 
     public:
 
-        Nitro::List<Mesh>& GetMeshes() { return mMeshes; }
+        std::map<std::string, std::shared_ptr<Mesh>>& GetMeshes() { return mMeshes; }
 
         void Dump();
         void Render();
@@ -123,9 +125,9 @@ namespace MDL0 {
 
 class NSBMD {
     bool mReady { false };
-    Nitro::List<MDL0::Model> mModels;
-    Nitro::List<TEX0::Texture> mTextures;
-    Nitro::List<TEX0::Palette> mPalettes;
+    std::map<std::string, std::shared_ptr<MDL0::Model>> mModels;
+    std::map<std::string, std::shared_ptr<TEX0::Texture>> mTextures;
+    std::map<std::string, std::shared_ptr<TEX0::Palette>> mPalettes;
         
 public:
     void Dump();
