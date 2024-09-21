@@ -77,6 +77,7 @@ namespace MDL0 {
         void SetType(uint32_t t) { mType = (PrimitiveType)(t); }
         PrimitiveType GetType() { return mType; }
         std::vector<Vertex>& GetVertices() { return mVertices; }
+        void SetVertices(std::vector<Vertex>& v) { mVertices = v; }
 
         void Render();
 

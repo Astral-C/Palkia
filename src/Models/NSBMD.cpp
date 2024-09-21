@@ -136,13 +136,9 @@ void Primitive::GenerateBuffers(){
 void Primitive::Render(){
     glBindVertexArray(mVao);
 
-    if(mType == PrimitiveType::Triangles){
+    if(mType == PrimitiveType::Triangles || mType == PrimitiveType::Quads){
         glDrawArrays(GL_TRIANGLES, 0, mVertices.size());
-    } else if(mType == PrimitiveType::Quads){
-        glDrawArrays(GL_QUADS, 0, mVertices.size());
-    } else if(mType == PrimitiveType::Tristrips){
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, mVertices.size());
-    } else if(mType == PrimitiveType::Quadstrips){
+    } else if(mType == PrimitiveType::Tristrips || mType == PrimitiveType::Quadstrips){
         glDrawArrays(GL_TRIANGLE_STRIP, 0, mVertices.size());
     }
 }
@@ -199,10 +195,29 @@ Mesh::Mesh(bStream::CStream& stream){
                     }
                     break;
                 
-                case 0x41:
+                case 0x41: {
+
+                    if(currentPrimitive->GetType() == PrimitiveType::Quads){
+                        std::vector<Vertex> triangulated;
+                        auto verts = currentPrimitive->GetVertices();
+                        
+                        for(int i = 0; i < verts.size(); i+=4){
+                            triangulated.push_back(verts[i + 0]);
+                            triangulated.push_back(verts[i + 1]);
+                            triangulated.push_back(verts[i + 2]);
+                            triangulated.push_back(verts[i + 0]);
+                            triangulated.push_back(verts[i + 2]);
+                            triangulated.push_back(verts[i + 3]);
+                        }
+
+                        triangulated.shrink_to_fit();
+                        currentPrimitive->SetVertices(triangulated);
+                    }
+
                     currentPrimitive->GenerateBuffers();
                     mPrimitives.push_back(currentPrimitive);
                     break;
+                }
 
                 case 0x23: {
                     uint32_t a = stream.readUInt32();
@@ -298,8 +313,8 @@ Mesh::Mesh(bStream::CStream& stream){
                     int16_t s = ((a & 0xFFFF) << 16) >> 16;
                     int16_t t = (((a >> 16) & 0xFFFF) << 16) >> 16;
 
-                    ctx.vtx.texcoord.x = s / 16.0f;
-                    ctx.vtx.texcoord.y = t / 16.0f;
+                    ctx.vtx.texcoord.x = s / 128.0f;
+                    ctx.vtx.texcoord.y = t / 128.0f;
 
                     break;
                 }
@@ -383,6 +398,21 @@ Model::Model(bStream::CStream& stream){
         return mesh;
     });
 
+    /*
+    stream.seek(materialsOffset + modelOffset);
+    std::cout << "Reading material list at " << std::hex << stream.tell() << std::endl;
+    mMaterials = Nitro::ReadList<std::shared_ptr<Material>>(stream, [&](bStream::CStream& stream){
+        uint32_t offset = stream.readUInt32();
+        size_t listPos = stream.tell();
+
+        stream.seek(offset + materialsOffset + modelOffset);
+
+        std::shared_ptr<Material> material = std::make_shared<Material>(stream);
+
+        stream.seek(listPos);
+        return material;
+    });
+    */
 }
 
 }

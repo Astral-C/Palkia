@@ -7,7 +7,7 @@
 
 USceneCamera::USceneCamera() : mNearPlane(1.0f), mFarPlane(1000000.f), mFovy(glm::radians(60.f)),
     mCenter(ZERO), mEye(ZERO), mPitch(0.f), mYaw(glm::half_pi<float>()), mUp(UNIT_Y), mRight(UNIT_X), mForward(UNIT_Z),
-    mAspectRatio(16.f / 9.f), mMoveSpeed(25.f), mMouseSensitivity(0.25f), mIsOrtho(false), mWinWidth(1280), mWinHeight(720), mOrthoZoom(1.0f)
+    mAspectRatio(16.f / 9.f), mMoveSpeed(10.f), mMouseSensitivity(0.25f), mIsOrtho(false), mWinWidth(1280), mWinHeight(720), mOrthoZoom(1.0f)
 {
 	mCenter = mEye - mForward;
 }
@@ -29,8 +29,8 @@ void USceneCamera::Update(float deltaTime) {
 	if (UInput::GetKey(GLFW_KEY_E))
 		moveDir += mUp;
 
-	mMoveSpeed += UInput::GetMouseScrollDelta() * 100 * deltaTime;
-	mMoveSpeed = std::clamp(mMoveSpeed, 100.f, 5000.f);
+	mMoveSpeed += UInput::GetMouseScrollDelta() * 10 * deltaTime;
+	mMoveSpeed = std::clamp(mMoveSpeed, 10.f, 500.f);
 	float actualMoveSpeed = UInput::GetKey(GLFW_KEY_LEFT_SHIFT) ? mMoveSpeed * 10.f : mMoveSpeed;
 
 	if (UInput::GetMouseButton(GLFW_MOUSE_BUTTON_RIGHT))

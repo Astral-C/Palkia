@@ -104,10 +104,6 @@ void UPalkiaContext::Render(float deltaTime) {
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, mPickTex, 0);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, mRbo);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
 		ImGui::DockBuilderRemoveNode(mMainDockSpaceID); // clear any previous layout
 		ImGui::DockBuilderAddNode(mMainDockSpaceID, dockFlags | ImGuiDockNodeFlags_DockSpace);
 		ImGui::DockBuilderSetNodeSize(mMainDockSpaceID, mainViewport->Size);
@@ -137,7 +133,7 @@ void UPalkiaContext::Render(float deltaTime) {
 			Palkia::Nitro::Archive arc(buildModelArc);
 
 
-			std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(76); //518
+			std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(1); //76 //518
 			bStream::CMemoryStream modelFile(model->GetData(), model->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
 
 			mCheckModel.Load(modelFile);
@@ -169,13 +165,13 @@ void UPalkiaContext::Render(float deltaTime) {
 
 			glBindTexture(GL_TEXTURE_2D, mViewTex);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (uint32_t)winSize.x, (uint32_t)winSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 			glBindTexture(GL_TEXTURE_2D, mPickTex);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, (uint32_t)winSize.x, (uint32_t)winSize.y, 0, GL_RED_INTEGER, GL_INT, nullptr);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mViewTex, 0);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, mPickTex, 0);
@@ -188,7 +184,6 @@ void UPalkiaContext::Render(float deltaTime) {
 		glViewport(0, 0, (uint32_t)winSize.x, (uint32_t)winSize.y);
 		glClearColor(0.100f, 0.261f, 0.402f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 
 		int32_t unused = 0;
 		glClearTexImage(mPickTex, 0, GL_RED_INTEGER, GL_INT, &unused);
