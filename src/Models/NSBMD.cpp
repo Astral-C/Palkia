@@ -54,8 +54,8 @@ const char* default_frg_shader_source = "#version 460\n\
     void main()\n\
     {\n\
         vec4 texel = texture(texSampler, fragTexCoord);\n\
-        outColor = texel * vec4(fragVtxColor.xyz, 1.0);\n\
-        outPick = 0;\n\
+        outColor = texel * vec4(fragVtxColor.xyz, 0.5);\n\
+        outPick = 1;\n\
     }\
 ";
 
@@ -156,9 +156,7 @@ void Mesh::Render(){
 
 void Model::Render(){
     // render based on render commands
-    for(auto [name, mesh] : mMeshes){
-        mesh->Render();
-    }
+    
 }
 
 Mesh::Mesh(bStream::CStream& stream){
@@ -313,8 +311,8 @@ Mesh::Mesh(bStream::CStream& stream){
                     int16_t s = ((a & 0xFFFF) << 16) >> 16;
                     int16_t t = (((a >> 16) & 0xFFFF) << 16) >> 16;
 
-                    ctx.vtx.texcoord.x = s / 128.0f;
-                    ctx.vtx.texcoord.y = t / 128.0f;
+                    ctx.vtx.texcoord.x = s / 16.0f;
+                    ctx.vtx.texcoord.y = t / 16.0f;
 
                     break;
                 }
@@ -347,6 +345,53 @@ Mesh::Mesh(bStream::CStream& stream){
         }
 
     }
+
+}
+
+Material::Material(bStream::CStream& stream){
+    stream.readUInt16(); //item tag
+    stream.readUInt16(); // size
+    
+    mDiffAmb = stream.readUInt32();
+    mSpeEmi = stream.readUInt32();
+    mPolygonAttr = stream.readUInt32();
+    uint32_t polygonAttrMask = stream.readUInt32();
+    mTexImgParams = stream.readUInt32();
+    uint32_t texImgParamsMask = stream.readUInt32();
+    uint16_t texturePaletteBase = stream.readUInt16();
+    uint16_t flag = stream.readUInt16();
+    
+    uint16_t oWidth = stream.readUInt16();
+    uint16_t oHeight = stream.readUInt16();
+
+    int16_t magW = fixed(stream.readUInt32());
+    int16_t magH = fixed(stream.readUInt32());
+
+
+    float scaleU = 1.0f, scaleV = 1.0f, cosR = 1.0f, sinR = 0.0f, transU = 0.0f, transV = 0.0f;
+    if(!(flag & 0x0002)){
+        scaleU = fixed(stream.readUInt32());
+        scaleV = fixed(stream.readUInt32());
+    }
+    
+    if(!(flag & 0x0004)){
+        cosR = fixed(stream.readUInt32());
+        sinR = fixed(stream.readUInt32());
+    }
+
+    if(!(flag & 0x0008)){
+        transU = fixed(stream.readUInt32());
+        transV = fixed(stream.readUInt32());
+    }
+
+    mTexMatrix = {
+        (1 / oWidth) * scaleU * cosR,
+        (1 / oWidth) * scaleV * -sinR,
+        (1 / oHeight) * scaleU * sinR,
+        (1 / oHeight) * scaleV * cosR,
+        scaleU * ((-0.5f * cosR) - (0.5 * sinR - 0.5) - transU),
+        scaleV * ((-0.5f * cosR) + (0.5 * sinR - 0.5) + transV) + 1.0f
+    };
 
 }
 
@@ -398,8 +443,29 @@ Model::Model(bStream::CStream& stream){
         return mesh;
     });
 
-    /*
     stream.seek(materialsOffset + modelOffset);
+    uint16_t materialTextureDictOffset = stream.readUInt16();
+    uint16_t materialPaletteDictOffset = stream.readUInt16();
+
+    stream.seek(materialsOffset + modelOffset + materialTextureDictOffset);
+    Nitro::ResourceDict<MaterialPair> mMaterialTexturePairs = Nitro::ReadList<MaterialPair>(stream, [&](bStream::CStream& stream){
+        MaterialPair p;
+        p.mIndexOffset = stream.readUInt16();
+        p.mNumMaterials = stream.readUInt8();
+        p.mIsBound = stream.readUInt8();
+        return p;
+    });
+
+    stream.seek(materialsOffset + modelOffset + materialPaletteDictOffset);
+    Nitro::ResourceDict<MaterialPair> mMaterialPalettePairs = Nitro::ReadList<MaterialPair>(stream, [&](bStream::CStream& stream){
+        MaterialPair p;
+        p.mIndexOffset = stream.readUInt16();
+        p.mNumMaterials = stream.readUInt8();
+        p.mIsBound = stream.readUInt8();
+        return p;
+    });
+
+    stream.seek(materialsOffset + modelOffset + sizeof(uint16_t) + sizeof(uint16_t));
     std::cout << "Reading material list at " << std::hex << stream.tell() << std::endl;
     mMaterials = Nitro::ReadList<std::shared_ptr<Material>>(stream, [&](bStream::CStream& stream){
         uint32_t offset = stream.readUInt32();
@@ -412,7 +478,25 @@ Model::Model(bStream::CStream& stream){
         stream.seek(listPos);
         return material;
     });
-    */
+
+    for(int i = 0; i < mMaterialTexturePairs.size(); i++){
+        for(int j = 0; j < mMaterialTexturePairs[i].second.mNumMaterials; j++){
+            uint8_t matIdx = stream.peekUInt8(modelOffset + materialsOffset + mMaterialTexturePairs[i].second.mIndexOffset + j);
+            mMaterials[matIdx].second->mTextureName = mMaterialTexturePairs[i].first;
+        }
+    }
+
+    for(int i = 0; i < mMaterialPalettePairs.size(); i++){
+        for(int j = 0; j < mMaterialPalettePairs[i].second.mNumMaterials; j++){
+            uint8_t matIdx = stream.peekUInt8(modelOffset + materialsOffset + mMaterialPalettePairs[i].second.mIndexOffset + j);
+            mMaterials[matIdx].second->mPaletteName = mMaterialPalettePairs[i].first;
+        }
+    }
+
+}
+
+void Material::Bind(){
+    glBindTextureUnit(0, mTexture);
 }
 
 }
@@ -480,7 +564,8 @@ Texture::Texture(bStream::CStream& stream, uint32_t texDataOffset){
 
 static int v = 0;
 
-void Texture::Convert(Palette p){
+uint32_t Texture::Convert(Palette p){
+    uint32_t mTexture = 0;
     glGenTextures(1, &mTexture);
     glBindTexture(GL_TEXTURE_2D, mTexture);
 
@@ -513,18 +598,8 @@ void Texture::Convert(Palette p){
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, mWidth, mHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data());
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    std::cout << "value of texture is " << mTexture << std::endl;
+    return mTexture;
 
-    stbi_write_png(std::format("{}.png", v++).c_str(), mWidth, mHeight, 4, image.data(), 4*mWidth);
-
-}
-
-void Texture::Bind(){
-    glBindTextureUnit(0, mTexture);
-}
-
-Texture::~Texture(){
-    glDeleteTextures(1, &mTexture);
 }
 
 Palette::Palette(bStream::CStream& stream, uint32_t paletteDataOffset, uint32_t paletteDataSize){
@@ -572,11 +647,8 @@ void NSBMD::Render(glm::mat4 v){
         glUseProgram(mProgram);
         glUniformMatrix4fv(glGetUniformLocation(mProgram, "transform"), 1, 0, &v[0][0]);
 
-        for(auto [modelName, model] : mModels){
-            for(auto [name, mesh] : model->GetMeshes()){
-                mTextures.begin()->second->Bind();
-                mesh->Render();
-            }
+        for(auto model : mModels.Items()){
+            model->Render();
         }
     }
 }
@@ -670,14 +742,8 @@ void NSBMD::Load(bStream::CStream& stream){
 
     }
 
-    auto texPairs = mTextures.begin();
-    auto palPairs = mPalettes.begin();
+    // Loop through materials & models to attach textures and palettes to materials - this also handles converting the texture - perhaps convert texture should return gl resource for loaded texture?
 
-    for (size_t i = 0; i < mTextures.size(); i++){
-        texPairs->second->Convert(*palPairs->second);
-        palPairs++;
-        texPairs++;
-    }
 
     mReady = true;
 

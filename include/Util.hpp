@@ -3,7 +3,7 @@
 #include <bstream/bstream.h>
 #include <functional>
 #include <vector>
-#include <map>
+#include <unordered_map>
 
 namespace Palkia {
 
@@ -26,16 +26,60 @@ float fixed(T n){
 namespace Nitro {
 
 template <typename T>
-std::map<std::string, T> ReadList(bStream::CStream& stream, std::function<T(bStream::CStream&)> read){
+class ResourceDict {
+    std::vector<std::pair<std::string, T>> mItems;
+
+public:
+    std::vector<std::pair<std::string, T>>& Items(){
+        return mItems;
+    }
+
+    std::pair<std::string, T>& operator[](std::string& key){
+        for(auto item : mItems){
+            if(item.first == key){
+                return item.second; 
+            }
+        }
+        mItems.push_back({key, T()});
+    }
+
+    std::pair<std::string, T>& operator[](int idx){
+        return mItems[idx];
+    }
+
+    bool contains(std::string& key){
+        for(auto item : mItems){
+            if(item.first == key){
+                return true; 
+            }
+        }
+        return false;
+    }
+
+    size_t size(){
+        return mItems.size();
+    }
+
+    void resize(size_t size){
+        mItems.resize(size);
+    }
+
+
+
+    ResourceDict(){}
+    ~ResourceDict(){}
+};
+
+template <typename T>
+ResourceDict<T> ReadList(bStream::CStream& stream, std::function<T(bStream::CStream&)> read){
     size_t size = 0;
     stream.skip(1); // dummy
 
     size = stream.readInt8();
 
-    std::vector<T> tempItems;
-    std::map<std::string, T> items;
+    ResourceDict<T> items;
 
-    tempItems.resize(size);
+    items.resize(size);
     stream.readUInt16(); // list size
 
     stream.skip(8 + (4 * size)); // undocumented
@@ -44,11 +88,11 @@ std::map<std::string, T> ReadList(bStream::CStream& stream, std::function<T(bStr
     stream.readUInt16(); // size of data section
 
     for (size_t i = 0; i < size; i++){
-        tempItems[i] = read(stream);
+        items[i] = {"dummy", read(stream)};
     }
     for (size_t i = 0; i < size; i++){
         std::string name = stream.readString(16);
-        items[name] = tempItems[i];
+        items[i].first = name;
     }
 
     return items;

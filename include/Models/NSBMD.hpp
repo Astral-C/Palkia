@@ -25,7 +25,6 @@ namespace TEX0 {
         uint32_t mDataOffset;
 
         std::vector<uint32_t> mImgData;
-        uint32_t mTexture { 0 };
 
 
     public:
@@ -35,16 +34,18 @@ namespace TEX0 {
         uint32_t GetHeight() { return mHeight; }
         Texture(bStream::CStream&, uint32_t);
 
-        void Convert(Palette p);
+        uint32_t Convert(Palette p);
         
         void Bind();
 
         Texture(){}
-        ~Texture();
+        ~Texture(){}
 
     };
 
 };
+
+class NSBMD;
 
 namespace MDL0 {
     class Mesh;
@@ -58,10 +59,10 @@ namespace MDL0 {
     } PrimitiveType;
 
     struct Vertex {
-        glm::vec3 position;
-        glm::vec3 normal;
-        glm::vec3 color;
-        glm::vec2 texcoord;
+        glm::vec3 position { 0.0f, 0.0f, 0.0f };
+        glm::vec3 normal { 0.0f, 0.0f, 0.0f };
+        glm::vec3 color { 1.0f, 1.0f, 1.0f };
+        glm::vec2 texcoord { 0.0f, 0.0f };
     };
 
     class Primitive {
@@ -88,8 +89,32 @@ namespace MDL0 {
     class RenderCommand { };
     class Bone { };
 
+    struct MaterialPair {
+        uint16_t mIndexOffset;
+        uint8_t mNumMaterials;
+        uint8_t mIsBound;
+    };
+
     class Material { 
-        uint32_t mDiffAmb, mSpeEmi, mPolygonAttr, mTexImgParams; // texwidth/height are duplicates?
+        uint32_t mDiffAmb;
+        uint32_t mSpeEmi;
+        uint32_t mPolygonAttr;
+        uint32_t mTexImgParams; // texwidth/height are duplicates?
+        glm::mat3x2 mTexMatrix;
+        uint32_t mTexture { 0 };
+
+    public:
+        std::string mTextureName, mPaletteName;
+
+        void Bind();
+
+        Material(){}
+        Material(bStream::CStream&);
+        ~Material(){
+            if(mTexture != 0){
+                glDeleteTextures(1, &mTexture);
+            }
+        }
     };
 
     class Mesh {
@@ -105,17 +130,19 @@ namespace MDL0 {
     };
 
     class Model { // MDL0
-        std::map<std::string, std::shared_ptr<RenderCommand>> mRenderCommands;
-        std::map<std::string, std::shared_ptr<Material>> mMaterials;
-        std::map<std::string, std::shared_ptr<Mesh>> mMeshes;
-        std::map<std::string, std::shared_ptr<Bone>> mBones;
+        Nitro::ResourceDict<std::shared_ptr<RenderCommand>> mRenderCommands;
+        Nitro::ResourceDict<std::shared_ptr<Material>> mMaterials;
+        Nitro::ResourceDict<std::shared_ptr<Mesh>> mMeshes;
+        Nitro::ResourceDict<std::shared_ptr<Bone>> mBones;
 
     public:
 
-        std::map<std::string, std::shared_ptr<Mesh>>& GetMeshes() { return mMeshes; }
+        Nitro::ResourceDict<std::shared_ptr<Mesh>>& GetMeshes() { return mMeshes; }
 
         void Dump();
         void Render();
+
+        void AttachMaterials(NSBMD* nsbmd);
 
         Model(){}
         Model(bStream::CStream& stream);
@@ -126,9 +153,9 @@ namespace MDL0 {
 
 class NSBMD {
     bool mReady { false };
-    std::map<std::string, std::shared_ptr<MDL0::Model>> mModels;
-    std::map<std::string, std::shared_ptr<TEX0::Texture>> mTextures;
-    std::map<std::string, std::shared_ptr<TEX0::Palette>> mPalettes;
+    Nitro::ResourceDict<std::shared_ptr<MDL0::Model>> mModels;
+    Nitro::ResourceDict<std::shared_ptr<TEX0::Texture>> mTextures;
+    Nitro::ResourceDict<std::shared_ptr<TEX0::Palette>> mPalettes;
         
 public:
     void Dump();

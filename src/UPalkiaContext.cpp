@@ -133,7 +133,7 @@ void UPalkiaContext::Render(float deltaTime) {
 			Palkia::Nitro::Archive arc(buildModelArc);
 
 
-			std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(1); //76 //518
+			std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(424); //76 //518
 			bStream::CMemoryStream modelFile(model->GetData(), model->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
 
 			mCheckModel.Load(modelFile);
