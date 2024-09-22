@@ -104,6 +104,8 @@ void UPalkiaContext::Render(float deltaTime) {
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, mPickTex, 0);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, mRbo);
 
+		assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
 		ImGui::DockBuilderRemoveNode(mMainDockSpaceID); // clear any previous layout
 		ImGui::DockBuilderAddNode(mMainDockSpaceID, dockFlags | ImGuiDockNodeFlags_DockSpace);
 		ImGui::DockBuilderSetNodeSize(mMainDockSpaceID, mainViewport->Size);
@@ -133,7 +135,7 @@ void UPalkiaContext::Render(float deltaTime) {
 			Palkia::Nitro::Archive arc(buildModelArc);
 
 
-			std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(424); //76 //518
+			std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(518); //76 //518
 			bStream::CMemoryStream modelFile(model->GetData(), model->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
 
 			mCheckModel.Load(modelFile);
@@ -177,14 +179,16 @@ void UPalkiaContext::Render(float deltaTime) {
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, mPickTex, 0);
 			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, mRbo);
 
-			GLenum attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-			glDrawBuffers(2, attachments);
+			assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+			GLenum attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_DEPTH_STENCIL_ATTACHMENT };
+			glDrawBuffers(3, attachments);
 		}
 		
 		glViewport(0, 0, (uint32_t)winSize.x, (uint32_t)winSize.y);
 		glClearColor(0.100f, 0.261f, 0.402f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+		glEnable(GL_DEPTH_TEST);
 		int32_t unused = 0;
 		glClearTexImage(mPickTex, 0, GL_RED_INTEGER, GL_INT, &unused);
 

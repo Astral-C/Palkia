@@ -26,15 +26,19 @@ const char* default_vtx_shader_source = "#version 460\n\
     layout(location = 1) in vec3 inNormal;\n\
     layout(location = 2) in vec3 inColor;\n\
     layout(location = 3) in vec2 inTexCoord;\n\
+    layout(location = 4) in int inMtxIdx; \n\
     \
     uniform mat4 transform;\n\
+    layout (std140) uniform Matrices{\n\
+        mat4 mtx[32];\n\
+    };\n\
     \
     layout(location = 0) out vec2 fragTexCoord;\n\
     layout(location = 1) out vec3 fragVtxColor;\n\
     \
     void main()\n\
     {\
-        gl_Position = transform * vec4(inPosition, 1.0);\n\
+        gl_Position = transform *  vec4(inPosition, 1.0);\n\
         fragVtxColor = inColor;\n\
         fragTexCoord = inTexCoord;\n\
     }\
@@ -45,6 +49,7 @@ const char* default_frg_shader_source = "#version 460\n\
     #extension GL_ARB_separate_shader_objects : enable\n\
     \
     uniform sampler2D texSampler;\n\
+    uniform mat3x2 texMatrix;\n\
     layout(location = 0) in vec2 fragTexCoord;\n\
     layout(location = 1) in vec3 fragVtxColor;\n\
     \
@@ -53,8 +58,9 @@ const char* default_frg_shader_source = "#version 460\n\
     \
     void main()\n\
     {\n\
-        vec4 texel = texture(texSampler, fragTexCoord);\n\
+        vec4 texel = texture(texSampler, (texMatrix * vec3(fragTexCoord, 0)).xy );\n\
         outColor = texel * vec4(fragVtxColor.xyz, 0.5);\n\
+        if(outColor.a < 1.0 / 255.0) discard;\n\
         outPick = 1;\n\
     }\
 ";
@@ -120,16 +126,19 @@ void Primitive::GenerateBuffers(){
     glEnableVertexArrayAttrib(mVao, 1);
     glEnableVertexArrayAttrib(mVao, 2);
     glEnableVertexArrayAttrib(mVao, 3);
+    glEnableVertexArrayAttrib(mVao, 4);
 
     glVertexArrayAttribFormat(mVao, 0, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, position));
     glVertexArrayAttribFormat(mVao, 1, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, normal));
     glVertexArrayAttribFormat(mVao, 2, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, color));
     glVertexArrayAttribFormat(mVao, 3, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, texcoord));
+    glVertexArrayAttribFormat(mVao, 4, 1, GL_UNSIGNED_INT, GL_FALSE, offsetof(Vertex, matrixId));
 
     glVertexArrayAttribBinding(mVao, 0, 0);
     glVertexArrayAttribBinding(mVao, 1, 0);
     glVertexArrayAttribBinding(mVao, 2, 0);
     glVertexArrayAttribBinding(mVao, 3, 0);
+    glVertexArrayAttribBinding(mVao, 4, 0);
 
 }
 
@@ -156,7 +165,121 @@ void Mesh::Render(){
 
 void Model::Render(){
     // render based on render commands
+    for(auto cmd : mRenderCommands){
+        switch(cmd.mOpCode){
+            // Load Matrix
+            case 0x03:
+                break;
+        
+            // Bind Material
+            case 0x04:
+            case 0x24:
+            case 0x44:
+                mMaterials[cmd.mArgs[0]].second->Bind();
+                break;
+
+            // Draw Mesh
+            case 0x05:
+                mMeshes[cmd.mArgs[0]].second->Render();
+                break;
+
+            //mtx stuff
+            case 0x06:
+            case 0x26:
+            case 0x46:
+            case 0x66:
+                break;
+            
+            // Calc Skinning
+            case 0x09:
+                break;
+
+            // Scale up/down
+            case 0x0b:
+            case 0x2b:
+                break;
+            default:
+                break;
+        }
+    }    
+}
+
+RenderCommand::RenderCommand(bStream::CStream& stream){
+    mOpCode = stream.readUInt8();
+
+    switch(mOpCode){
+        // Unknown
+        case 0x02:
+            mArgs[0] = stream.readUInt8();
+            mArgs[1] = stream.readUInt8();
+            break;
     
+        // Load Matrix
+        case 0x03:
+            mArgs[0] = stream.readUInt8();
+            break;
+    
+        // Bind Material
+        case 0x04:
+        case 0x24:
+        case 0x44:
+            mArgs[0] = stream.readUInt8();
+            break;
+
+        // Draw Mesh
+        case 0x05:
+            mArgs[0] = stream.readUInt8();
+            break;
+
+        case 0x06:
+        case 0x26:
+        case 0x46:
+        case 0x66:
+            mArgs[0] = stream.readUInt8();
+            if(mOpCode == 0x06) break;
+            mArgs[1] = stream.readUInt8();
+            mArgs[2] = stream.readUInt8();
+            mArgs[3] = stream.readUInt8();
+            if(mOpCode == 0x26 || mOpCode == 0x46) break;
+            mArgs[4] = stream.readUInt8();
+            break;
+        
+        // Unknown
+        case 0x07:
+        case 0x47:
+            mArgs[0] = stream.readUInt8();
+            break;
+
+        // Unknown
+        case 0x08:
+            mArgs[0] = stream.readUInt8();
+            break;
+
+        // Calc Skinning
+        case 0x09:
+            mArgs[0] = stream.readUInt8();
+            mArgs[1] = stream.readUInt8(); // # of terms
+            for (int i = 0; (i < mArgs[1] && i < 25); i++){
+                mArgs[2 + i] = stream.readUInt8();
+            }
+            break;
+
+        // No Args
+
+        // Nop
+        case 0x00:
+        // End
+        case 0x01:
+        // Scale up/down
+        case 0x0b:
+        case 0x2b:
+        // Unknown
+        case 0x40:
+        case 0x80:
+        default:
+            break;
+    }
+
 }
 
 Mesh::Mesh(bStream::CStream& stream){
@@ -178,7 +301,6 @@ Mesh::Mesh(bStream::CStream& stream){
     
     struct {
         Vertex vtx {};
-        glm::mat4 mat {};
     } ctx;
 
     while(stream.tell() < pos + commandsLen){
@@ -232,9 +354,9 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x24: {
                     uint32_t a = stream.readUInt32();
 
-                    ctx.vtx.position.x = (int16_t)(((a & 0x03FF) << 6) >> 6) / 64.0f;
-                    ctx.vtx.position.y = (int16_t)((((a >> 10) & 0x03FF) << 6) >> 6) / 64.0f;
-                    ctx.vtx.position.z = (int16_t)((((a >> 20) & 0x03FF) << 6) >> 6) / 64.0f;
+                    ctx.vtx.position.x = (int16_t)(((a & 0x03FF) << 22) >> 22) / 64.0f;
+                    ctx.vtx.position.y = (int16_t)((((a >> 10) & 0x03FF) << 22) >> 22) / 64.0f;
+                    ctx.vtx.position.z = (int16_t)((((a >> 20) & 0x03FF) << 22) >> 22) / 64.0f;
 
                     currentPrimitive->Push(ctx.vtx);
                     break;
@@ -318,15 +440,15 @@ Mesh::Mesh(bStream::CStream& stream){
                 }
 
                 case 0x14:{
-                    stream.readUInt32();
+                    ctx.vtx.matrixId = stream.readUInt32();
                     break;
                 } 
-                case 0x1b: {
-                    stream.readUInt32();
-                    stream.readUInt32();
-                    stream.readUInt32();
-                    break;
-                }
+                //case 0x1b: {
+                //    stream.readUInt32();
+                //    stream.readUInt32();
+                //    stream.readUInt32();
+                //    break;
+                //}
 
                 case 0x30: {
                     stream.readUInt32();
@@ -349,16 +471,16 @@ Mesh::Mesh(bStream::CStream& stream){
 }
 
 Material::Material(bStream::CStream& stream){
-    stream.readUInt16(); //item tag
-    stream.readUInt16(); // size
+    stream.readUInt16(); //item tag     0x02
+    stream.readUInt16(); // size        0x04
     
-    mDiffAmb = stream.readUInt32();
-    mSpeEmi = stream.readUInt32();
-    mPolygonAttr = stream.readUInt32();
-    uint32_t polygonAttrMask = stream.readUInt32();
-    mTexImgParams = stream.readUInt32();
-    uint32_t texImgParamsMask = stream.readUInt32();
-    uint16_t texturePaletteBase = stream.readUInt16();
+    mDiffAmb = stream.readUInt32(); //  0x08
+    mSpeEmi = stream.readUInt32();  //  0x0C
+    mPolygonAttr = stream.readUInt32(); // 0x10
+    uint32_t polygonAttrMask = stream.readUInt32(); // 0x14
+    mTexImgParams = stream.readUInt32(); // 0x18
+    uint32_t texImgParamsMask = stream.readUInt32(); //0x1C
+    uint16_t texturePaletteBase = stream.readUInt16(); 
     uint16_t flag = stream.readUInt16();
     
     uint16_t oWidth = stream.readUInt16();
@@ -370,13 +492,13 @@ Material::Material(bStream::CStream& stream){
 
     float scaleU = 1.0f, scaleV = 1.0f, cosR = 1.0f, sinR = 0.0f, transU = 0.0f, transV = 0.0f;
     if(!(flag & 0x0002)){
-        scaleU = fixed(stream.readUInt32());
-        scaleV = fixed(stream.readUInt32());
+        scaleU = fixed(stream.readInt32());
+        scaleV = fixed(stream.readInt32());
     }
     
     if(!(flag & 0x0004)){
-        cosR = fixed(stream.readUInt32());
         sinR = fixed(stream.readUInt32());
+        cosR = fixed(stream.readUInt32());
     }
 
     if(!(flag & 0x0008)){
@@ -384,11 +506,14 @@ Material::Material(bStream::CStream& stream){
         transV = fixed(stream.readUInt32());
     }
 
+    float texScaleU = 1.0f / (float)oWidth;
+    float texScaleV = 1.0f / (float)oHeight;
+
     mTexMatrix = {
-        (1 / oWidth) * scaleU * cosR,
-        (1 / oWidth) * scaleV * -sinR,
-        (1 / oHeight) * scaleU * sinR,
-        (1 / oHeight) * scaleV * cosR,
+        texScaleU * scaleU * cosR,
+        texScaleU * scaleV * -sinR,
+        texScaleV * scaleU * sinR,
+        texScaleV * scaleV * cosR,
         scaleU * ((-0.5f * cosR) - (0.5 * sinR - 0.5) - transU),
         scaleV * ((-0.5f * cosR) + (0.5 * sinR - 0.5) + transV) + 1.0f
     };
@@ -493,10 +618,27 @@ Model::Model(bStream::CStream& stream){
         }
     }
 
+    stream.seek(modelOffset + renderCMDOffset);
+    while(stream.tell() < modelOffset + materialsOffset){
+        mRenderCommands.push_back(RenderCommand(stream));
+        if(mRenderCommands.back().mOpCode == 0x01) break;
+    }
+
+    std::fill(mMatrixStack.begin(), mMatrixStack.end(), glm::mat4(1.0f));
+
+    glCreateBuffers(1, &mUbo);
+    glNamedBufferStorage(mUbo, sizeof(glm::mat4)*mMatrixStack.size(), mMatrixStack.data(), GL_DYNAMIC_STORAGE_BIT);
 }
 
 void Material::Bind(){
+    glUniformMatrix3x2fv(glGetUniformLocation(mProgram, "texMatrix"), 1, 0, &mTexMatrix[0][0]);
     glBindTextureUnit(0, mTexture);
+}
+
+Material::~Material(){
+    if(mTexture != 0){
+        glDeleteTextures(1, &mTexture);
+    }
 }
 
 }
@@ -647,7 +789,7 @@ void NSBMD::Render(glm::mat4 v){
         glUseProgram(mProgram);
         glUniformMatrix4fv(glGetUniformLocation(mProgram, "transform"), 1, 0, &v[0][0]);
 
-        for(auto model : mModels.Items()){
+        for(auto [name, model] : mModels.Items()){
             model->Render();
         }
     }
@@ -672,7 +814,7 @@ void NSBMD::Load(bStream::CStream& stream){
         std::cout << "Reading Segment at " << std::hex << stream.tell() << std::endl;
         std::cout << "Stamp is " << stream.peekString(stream.tell(), 4) << std::endl;
         uint32_t stamp = stream.readUInt32();
-        
+
         switch (stamp){
             case 0x304C444D: {  // MDL0, why is this the wrong way???? '0LDM'
                 stream.readUInt32(); // section size
@@ -743,10 +885,16 @@ void NSBMD::Load(bStream::CStream& stream){
     }
 
     // Loop through materials & models to attach textures and palettes to materials - this also handles converting the texture - perhaps convert texture should return gl resource for loaded texture?
-
+    for(auto [name, model] : mModels.Items()){
+        for(auto [name, material] : model->GetMaterials().Items()){
+            std::cout << "Attaching Texture " << material->mTextureName << " with palette " << material->mPaletteName << std::endl;
+            if(mTextures.contains(material->mTextureName) && mPalettes.contains(material->mPaletteName)){
+                material->SetTexture(mTextures[material->mTextureName]->Convert(*mPalettes[material->mPaletteName]));
+            }
+        }
+    }
 
     mReady = true;
-
 }
 
 void NSBMD::Dump(){

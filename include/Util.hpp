@@ -34,13 +34,14 @@ public:
         return mItems;
     }
 
-    std::pair<std::string, T>& operator[](std::string& key){
-        for(auto item : mItems){
-            if(item.first == key){
-                return item.second; 
+    T& operator[](std::string& key){
+        for(size_t i = 0; i < mItems.size(); i++){
+            if(mItems[i].first == key){
+                return mItems[i].second; 
             }
         }
         mItems.push_back({key, T()});
+        return mItems.back().second;
     }
 
     std::pair<std::string, T>& operator[](int idx){

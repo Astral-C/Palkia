@@ -63,6 +63,7 @@ namespace MDL0 {
         glm::vec3 normal { 0.0f, 0.0f, 0.0f };
         glm::vec3 color { 1.0f, 1.0f, 1.0f };
         glm::vec2 texcoord { 0.0f, 0.0f };
+        uint32_t matrixId { 0 };
     };
 
     class Primitive {
@@ -86,8 +87,16 @@ namespace MDL0 {
         ~Primitive();
     };
 
-    class RenderCommand { };
     class Bone { };
+    
+    struct RenderCommand { 
+        uint8_t mOpCode { 1 };
+        uint8_t mArgs[25] { 0 };
+
+        RenderCommand(){}
+        RenderCommand(bStream::CStream& stream);
+        ~RenderCommand(){}
+    };
 
     struct MaterialPair {
         uint16_t mIndexOffset;
@@ -106,15 +115,13 @@ namespace MDL0 {
     public:
         std::string mTextureName, mPaletteName;
 
+        void SetTexture(uint32_t t) { mTexture = t; }
+
         void Bind();
 
         Material(){}
         Material(bStream::CStream&);
-        ~Material(){
-            if(mTexture != 0){
-                glDeleteTextures(1, &mTexture);
-            }
-        }
+        ~Material();
     };
 
     class Mesh {
@@ -130,19 +137,20 @@ namespace MDL0 {
     };
 
     class Model { // MDL0
-        Nitro::ResourceDict<std::shared_ptr<RenderCommand>> mRenderCommands;
-        Nitro::ResourceDict<std::shared_ptr<Material>> mMaterials;
+        uint32_t mUbo { 0 };
+        std::vector<Bone> mBones;
+        std::vector<RenderCommand> mRenderCommands;
         Nitro::ResourceDict<std::shared_ptr<Mesh>> mMeshes;
-        Nitro::ResourceDict<std::shared_ptr<Bone>> mBones;
+        Nitro::ResourceDict<std::shared_ptr<Material>> mMaterials;
+        std::array<glm::mat4, 32> mMatrixStack;
 
     public:
 
         Nitro::ResourceDict<std::shared_ptr<Mesh>>& GetMeshes() { return mMeshes; }
+        Nitro::ResourceDict<std::shared_ptr<Material>>& GetMaterials() { return mMaterials; }
 
         void Dump();
         void Render();
-
-        void AttachMaterials(NSBMD* nsbmd);
 
         Model(){}
         Model(bStream::CStream& stream);
