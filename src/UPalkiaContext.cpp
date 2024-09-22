@@ -134,11 +134,12 @@ void UPalkiaContext::Render(float deltaTime) {
 			bStream::CFileStream buildModelArc("build_model.narc");
 			Palkia::Nitro::Archive arc(buildModelArc);
 
-
-			std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(518); //76 //518
-			bStream::CMemoryStream modelFile(model->GetData(), model->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
-
-			mCheckModel.Load(modelFile);
+			for(int i = 0; i < 256; i++){
+				std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(i); //76 //518
+				bStream::CMemoryStream modelFile(model->GetData(), model->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
+				mModels.push_back(Palkia::NSBMD());
+				mModels.back().Load(modelFile);
+			}
 		}
 	ImGui::End();
 
@@ -199,7 +200,12 @@ void UPalkiaContext::Render(float deltaTime) {
 		projection = mCamera.GetProjectionMatrix();
 		view = mCamera.GetViewMatrix();
 
-		mCheckModel.Render(projection * view);
+		glm::mat4 modelView = projection * view;
+
+		for(int i = 0; i < mModels.size(); i++){
+			modelView = glm::translate(modelView, glm::vec3(20.0f, 0.0f, 0.0f));
+			mModels[i].Render(modelView);
+		}
 
 		cursorPos = ImGui::GetCursorScreenPos();
 		ImGui::Image(reinterpret_cast<void*>(static_cast<uintptr_t>(mViewTex)), { winSize.x, winSize.y }, {0.0f, 1.0f}, {1.0f, 0.0f});

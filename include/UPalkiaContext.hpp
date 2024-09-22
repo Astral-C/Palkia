@@ -11,7 +11,7 @@ class UPalkiaContext {
 
 	uint32_t mGizmoOperation { 0 };
 
-	Palkia::NSBMD mCheckModel;
+	std::vector<Palkia::NSBMD> mModels;
 
 	USceneCamera mCamera;
 

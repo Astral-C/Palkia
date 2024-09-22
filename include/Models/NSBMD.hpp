@@ -49,7 +49,7 @@ class NSBMD;
 
 namespace MDL0 {
     class Mesh;
-    
+
     typedef enum {
         Triangles,
         Quads,
@@ -143,6 +143,8 @@ namespace MDL0 {
         Nitro::ResourceDict<std::shared_ptr<Mesh>> mMeshes;
         Nitro::ResourceDict<std::shared_ptr<Material>> mMaterials;
         std::array<glm::mat4, 32> mMatrixStack;
+        float mUpScale { 1.0f };
+        float mDownScale { 1.0f };
 
     public:
 

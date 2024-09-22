@@ -9,6 +9,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 #include <format>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace Palkia {
 
@@ -29,16 +30,15 @@ const char* default_vtx_shader_source = "#version 460\n\
     layout(location = 4) in int inMtxIdx; \n\
     \
     uniform mat4 transform;\n\
-    layout (std140) uniform Matrices{\n\
-        mat4 mtx[32];\n\
-    };\n\
+    uniform mat4 stackMtx;\n\
+    uniform mat4 scaleMtx;\n\
     \
     layout(location = 0) out vec2 fragTexCoord;\n\
     layout(location = 1) out vec3 fragVtxColor;\n\
     \
     void main()\n\
     {\
-        gl_Position = transform *  vec4(inPosition, 1.0);\n\
+        gl_Position = transform * stackMtx * scaleMtx * vec4(inPosition, 1.0);\n\
         fragVtxColor = inColor;\n\
         fragTexCoord = inTexCoord;\n\
     }\
@@ -113,6 +113,11 @@ void InitShaders(){
 
 namespace MDL0 {
 
+Primitive::~Primitive(){
+    glDeleteVertexArrays(1, &mVao);
+    glDeleteBuffers(1, &mVbo);
+}
+
 void Primitive::GenerateBuffers(){
 
     glCreateBuffers(1, &mVbo);
@@ -152,11 +157,6 @@ void Primitive::Render(){
     }
 }
 
-Primitive::~Primitive(){
-    glDeleteVertexArrays(1, &mVao);
-    glDeleteBuffers(1, &mVbo);
-}
-
 void Mesh::Render(){
     for(auto primitive : mPrimitives){
         primitive->Render();
@@ -165,10 +165,13 @@ void Mesh::Render(){
 
 void Model::Render(){
     // render based on render commands
+    uint32_t curMtxID = 0;
+    std::array<glm::mat4, 32> tempMtxStack = mMatrixStack;
     for(auto cmd : mRenderCommands){
         switch(cmd.mOpCode){
             // Load Matrix
             case 0x03:
+                curMtxID = cmd.mArgs[0];
                 break;
         
             // Bind Material
@@ -180,6 +183,8 @@ void Model::Render(){
 
             // Draw Mesh
             case 0x05:
+                glUniformMatrix4fv(glGetUniformLocation(mProgram, "scaleMtx"), 1, 0, &glm::scale(glm::mat4(1.0f), glm::vec3(mUpScale))[0][0]);
+                glUniformMatrix4fv(glGetUniformLocation(mProgram, "stackMtx"), 1, 0, &(tempMtxStack[curMtxID])[0][0]);
                 mMeshes[cmd.mArgs[0]].second->Render();
                 break;
 
@@ -196,7 +201,10 @@ void Model::Render(){
 
             // Scale up/down
             case 0x0b:
+                tempMtxStack[curMtxID] *= mUpScale;
+                break;
             case 0x2b:
+                tempMtxStack[curMtxID] *= mDownScale;
                 break;
             default:
                 break;
@@ -343,9 +351,9 @@ Mesh::Mesh(bStream::CStream& stream){
                     uint32_t a = stream.readUInt32();
                     uint32_t b = stream.readUInt32();
                     
-                    ctx.vtx.position.x = (int16_t)(((a & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.y = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.z = (int16_t)(((b & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.x = ((((int16_t)(a & 0xFFFF)) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.y = ((((int16_t)((a >> 16) & 0xFFFF)) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = ((((int16_t)(b & 0xFFFF)) << 16) >> 16) / 4096.0f;
 
                     currentPrimitive->Push(ctx.vtx);
                     break;
@@ -354,9 +362,9 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x24: {
                     uint32_t a = stream.readUInt32();
 
-                    ctx.vtx.position.x = (int16_t)(((a & 0x03FF) << 22) >> 22) / 64.0f;
-                    ctx.vtx.position.y = (int16_t)((((a >> 10) & 0x03FF) << 22) >> 22) / 64.0f;
-                    ctx.vtx.position.z = (int16_t)((((a >> 20) & 0x03FF) << 22) >> 22) / 64.0f;
+                    ctx.vtx.position.x = ((((int16_t)((a >>  0) & 0x03FF)) << 22) >> 22) / 64.0f;
+                    ctx.vtx.position.y = ((((int16_t)((a >> 10) & 0x03FF)) << 22) >> 22) / 64.0f;
+                    ctx.vtx.position.z = ((((int16_t)((a >> 20) & 0x03FF)) << 22) >> 22) / 64.0f;
 
                     currentPrimitive->Push(ctx.vtx);
                     break;
@@ -365,8 +373,8 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x25: {
                     uint32_t a = stream.readUInt32();
                     
-                    ctx.vtx.position.x = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.y = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.x = ((((int16_t)((a >>  0) & 0xFFFF)) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.y = ((((int16_t)((a >> 16) & 0xFFFF)) << 16) >> 16) / 4096.0f;
 
                     currentPrimitive->Push(ctx.vtx);
                     break;
@@ -375,8 +383,8 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x26: {
                     uint32_t a = stream.readUInt32();
 
-                    ctx.vtx.position.x = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.z = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.x = ((((int16_t)((a >>  0) & 0xFFFF)) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = ((((int16_t)((a >> 16) & 0xFFFF)) << 16) >> 16) / 4096.0f;
                     
                     currentPrimitive->Push(ctx.vtx);
                     break;
@@ -385,8 +393,8 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x27: {
                     uint32_t a = stream.readUInt32();
 
-                    ctx.vtx.position.y = (int16_t)((((a >>  0) & 0xFFFF) << 16) >> 16) / 4096.0f;
-                    ctx.vtx.position.z = (int16_t)((((a >> 16) & 0xFFFF) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.y = ((((int16_t)((a >>  0) & 0xFFFF)) << 16) >> 16) / 4096.0f;
+                    ctx.vtx.position.z = ((((int16_t)((a >> 16) & 0xFFFF)) << 16) >> 16) / 4096.0f;
                     
                     currentPrimitive->Push(ctx.vtx);
                     break;
@@ -395,9 +403,9 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x28: {
                     uint32_t a = stream.readUInt32();
 
-                    ctx.vtx.position.x += ((int16_t)((((a >>  0) & 0x03FF) << 22) >> 22)) / 4096.0f;
-                    ctx.vtx.position.y += ((int16_t)((((a >> 10) & 0x03FF) << 22) >> 22)) / 4096.0f;
-                    ctx.vtx.position.z += ((int16_t)((((a >> 20) & 0x03FF) << 22) >> 22)) / 4096.0f;
+                    ctx.vtx.position.x += ((((int16_t)((a >>  0) & 0x03FF)) << 22) >> 22) / 4096.0f;
+                    ctx.vtx.position.y += ((((int16_t)((a >> 10) & 0x03FF)) << 22) >> 22) / 4096.0f;
+                    ctx.vtx.position.z += ((((int16_t)((a >> 20) & 0x03FF)) << 22) >> 22) / 4096.0f;
 
                     currentPrimitive->Push(ctx.vtx);
                     break;
@@ -407,9 +415,9 @@ Mesh::Mesh(bStream::CStream& stream){
                     uint32_t a = stream.readUInt32();
 
                     glm::vec3 vtx;
-                    vtx.x = ((int16_t)(((a & 0x03FF) << 22) >> 22)) / 1024.0f;
-                    vtx.y = ((int16_t)((((a >> 10) & 0x03FF) << 22) >> 22)) / 1024.0f;
-                    vtx.z = ((int16_t)((((a >> 20) & 0x03FF) << 22) >> 22)) / 1024.0f;
+                    vtx.x = ((((int16_t)((a >> 0)  & 0x03FF)) << 22) >> 22) / 1024.0f;
+                    vtx.y = ((((int16_t)((a >> 10) & 0x03FF)) << 22) >> 22) / 1024.0f;
+                    vtx.z = ((((int16_t)((a >> 20) & 0x03FF)) << 22) >> 22) / 1024.0f;
 
                     ctx.vtx.normal = vtx;
                     break;
@@ -443,12 +451,13 @@ Mesh::Mesh(bStream::CStream& stream){
                     ctx.vtx.matrixId = stream.readUInt32();
                     break;
                 } 
-                //case 0x1b: {
-                //    stream.readUInt32();
-                //    stream.readUInt32();
-                //    stream.readUInt32();
-                //    break;
-                //}
+                
+                case 0x1b: {
+                    stream.readUInt32();
+                    stream.readUInt32();
+                    stream.readUInt32();
+                    break;
+                }
 
                 case 0x30: {
                     stream.readUInt32();
@@ -536,8 +545,8 @@ Model::Model(bStream::CStream& stream){
     stream.skip(2);
 
     //apparently unused
-    stream.readUInt32(); // up scale
-    stream.readUInt32(); // down scale
+    mUpScale = fixed(stream.readUInt32()); // up scale
+    mDownScale = fixed(stream.readUInt32()); // down scale
 
     stream.readUInt16(); // num verts
     stream.readUInt16(); // num polys
@@ -626,8 +635,9 @@ Model::Model(bStream::CStream& stream){
 
     std::fill(mMatrixStack.begin(), mMatrixStack.end(), glm::mat4(1.0f));
 
-    glCreateBuffers(1, &mUbo);
-    glNamedBufferStorage(mUbo, sizeof(glm::mat4)*mMatrixStack.size(), mMatrixStack.data(), GL_DYNAMIC_STORAGE_BIT);
+    //glCreateBuffers(1, &mUbo);
+    //glNamedBufferStorage(mUbo, sizeof(NSBMDUniformBufferObject), &mUniformData GL_DYNAMIC_STORAGE_BIT);
+	//glBindBufferRange(GL_UNIFORM_BUFFER, 0, mUbo, 0, sizeof(NSBMDUniformBufferObject));
 }
 
 void Material::Bind(){
@@ -703,8 +713,6 @@ Texture::Texture(bStream::CStream& stream, uint32_t texDataOffset){
 
     stream.seek(pos);
 }
-
-static int v = 0;
 
 uint32_t Texture::Convert(Palette p){
     uint32_t mTexture = 0;
