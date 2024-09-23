@@ -12,7 +12,7 @@
 #include <System/Rom.hpp>
 #include <System/Archive.hpp>
 #include <Models/NSBMD.hpp>
-
+#include <Util.hpp>
 
 #include "IconsForkAwesome.h"
 
@@ -130,15 +130,58 @@ void UPalkiaContext::Render(float deltaTime) {
 	ImGui::Begin("mainWindow", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 	ImGui::Text("Map");
 		ImGui::Separator();
+		ImGui::InputInt("Map ID", &mLoadMap);
 		if(ImGui::Button("Load")){
-			bStream::CFileStream buildModelArc("build_model.narc");
-			Palkia::Nitro::Archive arc(buildModelArc);
+			
+			Palkia::Nitro::Rom rom("platinum.nds");
 
-			for(int i = 0; i < 256; i++){
-				std::shared_ptr<Palkia::Nitro::File> model = arc.GetFileByIndex(i); //76 //518
-				bStream::CMemoryStream modelFile(model->GetData(), model->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
-				mModels.push_back(Palkia::NSBMD());
-				mModels.back().Load(modelFile);
+			//rom.Dump();
+			std::shared_ptr<Palkia::Nitro::File> buildModelFile = rom.GetFile("fielddata/build_model/build_model.narc");
+			std::shared_ptr<Palkia::Nitro::File> landDataFile = rom.GetFile("fielddata/land_data/land_data.narc");
+			
+			bStream::CMemoryStream buildModelStream(buildModelFile->GetData(), buildModelFile->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
+			bStream::CMemoryStream landDataStream(landDataFile->GetData(), landDataFile->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
+			
+			Palkia::Nitro::Archive buildModelArc(buildModelStream);
+			Palkia::Nitro::Archive landDataArc(landDataStream);
+
+			mMapModel = Palkia::NSBMD();
+			mModels.clear();
+			mObjects.clear();
+
+			std::shared_ptr<Palkia::Nitro::File> mapFile = landDataArc.GetFileByIndex(mLoadMap);
+			bStream::CMemoryStream map(mapFile->GetData(), mapFile->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
+			
+			bStream::CFileStream dumpedMapData("dump.bin", bStream::Endianess::Little, bStream::OpenMode::Out);
+			dumpedMapData.writeBytes(mapFile->GetData(), mapFile->GetSize());
+
+			uint32_t objectsOffset = map.readUInt32() + 0x10;
+			uint32_t modelOffset = map.readUInt32() + objectsOffset;
+			uint32_t modelSize = map.readUInt32();
+
+			bStream::CMemoryStream mapModel(mapFile->GetData() + modelOffset, modelSize, bStream::Endianess::Little, bStream::OpenMode::In);
+			mMapModel.Load(mapModel);
+
+			for(int i = 0; i < (modelOffset - objectsOffset) / 0x30; i++){
+				std::cout << "Loading Object " << i << std::endl;
+				map.seek(objectsOffset + (i * 0x30));
+				uint32_t modelID = map.readUInt32();
+				float x = (float)map.readUInt32() / (1 << 12);
+				float y = (float)map.readUInt32() / (1 << 12);
+				float z = (float)map.readUInt32() / (1 << 12);
+				
+				glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(x,y,z));
+
+				mObjects.push_back({modelID, transform});
+
+				if(!mModels.contains(modelID)){
+					std::shared_ptr<Palkia::Nitro::File> model = buildModelArc.GetFileByIndex(modelID); //76 //518
+				
+					bStream::CMemoryStream modelFile(model->GetData(), model->GetSize(), bStream::Endianess::Little, bStream::OpenMode::In);
+					Palkia::NSBMD objModel;
+					objModel.Load(modelFile);
+					mModels.insert({modelID, objModel});
+				}
 			}
 		}
 	ImGui::End();
@@ -202,9 +245,10 @@ void UPalkiaContext::Render(float deltaTime) {
 
 		glm::mat4 modelView = projection * view;
 
-		for(int i = 0; i < mModels.size(); i++){
-			modelView = glm::translate(modelView, glm::vec3(20.0f, 0.0f, 0.0f));
-			mModels[i].Render(modelView);
+		mMapModel.Render(modelView);
+
+		for(auto obj : mObjects){
+			mModels[obj.first].Render(modelView * obj.second);
 		}
 
 		cursorPos = ImGui::GetCursorScreenPos();

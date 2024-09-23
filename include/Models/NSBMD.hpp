@@ -166,7 +166,7 @@ class NSBMD {
     Nitro::ResourceDict<std::shared_ptr<MDL0::Model>> mModels;
     Nitro::ResourceDict<std::shared_ptr<TEX0::Texture>> mTextures;
     Nitro::ResourceDict<std::shared_ptr<TEX0::Palette>> mPalettes;
-        
+    
 public:
     void Dump();
     void Render(glm::mat4 v);

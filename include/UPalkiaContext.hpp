@@ -3,6 +3,7 @@
 #include "UCamera.hpp"
 #include "Models/NSBMD.hpp"
 
+#include <map>
 #include <vector>
 #include <filesystem>
 #include <memory>
@@ -11,7 +12,9 @@ class UPalkiaContext {
 
 	uint32_t mGizmoOperation { 0 };
 
-	std::vector<Palkia::NSBMD> mModels;
+	std::vector<std::pair<uint32_t, glm::mat4>> mObjects;
+	std::map<uint32_t, Palkia::NSBMD> mModels;
+	Palkia::NSBMD mMapModel;
 
 	USceneCamera mCamera;
 
@@ -20,8 +23,6 @@ class UPalkiaContext {
 	uint32_t mDockNodeUpLeftID;
 	uint32_t mDockNodeDownLeftID;
 	
-	std::string mSelectedAddZone { "" };
-
 	bool mOptionsOpen { false };
 	bool mViewportIsFocused { false };
 
@@ -34,6 +35,8 @@ class UPalkiaContext {
 
 	float mPrevWinWidth { -1.0f };
 	float mPrevWinHeight { -1.0f };
+
+	uint32_t mLoadMap { 0 };
 
 	void RenderMainWindow(float deltaTime);
 	void RenderPanels(float deltaTime);
