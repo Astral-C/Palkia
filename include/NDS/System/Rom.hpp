@@ -4,7 +4,7 @@
 #include <vector>
 #include <memory>
 #include <bstream/bstream.h>
-#include "System/FileSystem.hpp"
+#include "NDS/System/FileSystem.hpp"
 #include <filesystem>
 #include "Util.hpp"
 

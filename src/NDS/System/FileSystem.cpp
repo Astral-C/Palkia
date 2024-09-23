@@ -1,7 +1,20 @@
 #include "Util.hpp"
-#include "System/FileSystem.hpp"
+#include "NDS/System/FileSystem.hpp"
 
 namespace Palkia::Nitro {
+
+void File::SetData(uint8_t* data, size_t size){
+	if(mData != nullptr){
+		delete[] mData;
+	}
+
+	mData = new uint8_t[size];
+	memcpy(mData, data, size);
+}
+
+void Folder::AddFile(std::shared_ptr<File> file){
+	mFiles.push_back(file);
+}
 
 void Folder::Dump(std::filesystem::path out_path){
 	for (auto& directory : mFolders){

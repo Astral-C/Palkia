@@ -1,5 +1,5 @@
 #pragma once
-#include "System/FileSystem.hpp"
+#include "NDS/System/FileSystem.hpp"
 
 namespace Palkia::Nitro {
 

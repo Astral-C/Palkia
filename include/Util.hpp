@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __UTIL_H__
+#define __UTIL_H__
 #include <cstdint>
 #include <bstream/bstream.h>
 #include <functional>
@@ -18,10 +19,15 @@ typedef union {
     uint32_t rgba; 
 } Color;
 
+
 template<typename T>
 float fixed(T n){
     return (float)n / (1 << 12);
 }
+
+uint8_t cv3To8(uint8_t v);
+uint8_t cv5To8(uint8_t v);
+uint8_t s3tcBlend(uint8_t a, uint8_t b);
 
 namespace Nitro {
 
@@ -102,3 +108,5 @@ ResourceDict<T> ReadList(bStream::CStream& stream, std::function<T(bStream::CStr
 }
 
 }
+
+#endif

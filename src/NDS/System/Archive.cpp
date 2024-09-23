@@ -1,4 +1,4 @@
-#include "System/Archive.hpp"
+#include "NDS/System/Archive.hpp"
 #include "Util.hpp"
 
 namespace Palkia::Nitro {

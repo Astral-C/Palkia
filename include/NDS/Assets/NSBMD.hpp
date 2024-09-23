@@ -4,52 +4,14 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <memory>
+#include <NDS/Assets/NSBTX.hpp>
 
 namespace Palkia {
-
-namespace TEX0 {
-    class Palette { 
-        uint32_t mColorCount { 0 };
-        std::vector<glm::vec3> mColors;
-    public: 
-        std::vector<glm::vec3> GetColors() { return mColors; }
-        Palette(bStream::CStream&, uint32_t, uint32_t);
-        Palette(){}
-        ~Palette(){}
-    };
-
-    class Texture {
-        uint32_t mFormat;
-        uint32_t mWidth, mHeight;
-        uint32_t mColor0;
-        uint32_t mDataOffset;
-
-        std::vector<uint32_t> mImgData;
-
-
-    public:
-    
-        uint32_t GetFormat() { return mFormat; }
-        uint32_t GetWidth() { return mWidth; }
-        uint32_t GetHeight() { return mHeight; }
-        Texture(bStream::CStream&, uint32_t);
-
-        uint32_t Convert(Palette p);
-        
-        void Bind();
-
-        Texture(){}
-        ~Texture(){}
-
-    };
-
-};
 
 class NSBMD;
 
 namespace MDL0 {
-    class Mesh;
-
+    
     typedef enum {
         Triangles,
         Quads,
@@ -66,6 +28,8 @@ namespace MDL0 {
         uint32_t matrixId { 0 };
     };
 
+
+    class Mesh;
     class Primitive {
     friend Mesh;
         uint32_t mVao, mVbo;
@@ -159,7 +123,10 @@ namespace MDL0 {
         ~Model(){}
     };
 
+    void Parse(bStream::CStream& stream, uint32_t offset, Nitro::ResourceDict<std::shared_ptr<MDL0::Model>>& models);
 }
+
+namespace Formats {
 
 class NSBMD {
     bool mReady { false };
@@ -168,11 +135,14 @@ class NSBMD {
     Nitro::ResourceDict<std::shared_ptr<TEX0::Palette>> mPalettes;
     
 public:
-    void Dump();
+    void AttachNSBTX(NSBTX* nsbtx);
+
     void Render(glm::mat4 v);
     void Load(bStream::CStream& stream);
-    NSBMD();
-    ~NSBMD();
+
+    NSBMD(){}
+    ~NSBMD(){}
 };
 
+}
 }

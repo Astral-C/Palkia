@@ -28,6 +28,8 @@ public:
 	uint16_t GetID() { return mID; }
 	void SetName(std::string name) { mName = name; }
 
+	void SetData(uint8_t* data, size_t size);
+
 	std::string GetName() { return mName; }
 
 	static std::shared_ptr<File> Create() { return std::make_shared<File>(); }
@@ -76,6 +78,8 @@ public:
 	std::string GetName() { return mName; }
 	std::shared_ptr<File> GetFile(std::filesystem::path);
 
+	void AddFile(std::shared_ptr<File> file);
+	
 	void Dump(std::filesystem::path out_path);
 
 	static std::shared_ptr<Folder> Create(std::shared_ptr<FileSystem> fs) { return std::make_shared<Folder>(fs); }

@@ -1,25 +1,16 @@
 #include <vector>
 #include <glad/glad.h>
-#include <Models/NSBMD.hpp>
+#include <NDS/Assets/NSBTX.hpp>
+#include <NDS/Assets/NSBMD.hpp>
 #include <Util.hpp>
 #include <string>
 #include <sstream>
 #include <fstream>
 #include <algorithm>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
 #include <format>
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace Palkia {
-
-uint8_t cv3To8(uint8_t v){
-    return (v << 5) | (v << 2) | (v >> 1);
-}
-
-uint8_t cv5To8(uint8_t v){
-    return (v << 3) | (v >> 2);
-}
 
 const char* default_vtx_shader_source = "#version 460\n\
     #extension GL_ARB_separate_shader_objects : enable\n\
@@ -112,6 +103,22 @@ void InitShaders(){
 }
 
 namespace MDL0 {
+
+void Parse(bStream::CStream& stream, uint32_t offset, Nitro::ResourceDict<std::shared_ptr<MDL0::Model>>& models){
+    stream.readUInt32(); // section size
+    std::cout << "Reading model list at " << std::hex << stream.tell() << std::endl;
+    models = Nitro::ReadList<std::shared_ptr<MDL0::Model>>(stream, [&](bStream::CStream& stream){
+        uint32_t modelOffset = stream.readUInt32();
+        size_t listPos = stream.tell();
+
+        stream.seek(offset + modelOffset);
+
+        std::shared_ptr<MDL0::Model> model = std::make_shared<MDL0::Model>(stream);
+
+        stream.seek(listPos);
+        return model;
+    });
+}
 
 Primitive::~Primitive(){
     glDeleteVertexArrays(1, &mVao);
@@ -329,7 +336,7 @@ Mesh::Mesh(bStream::CStream& stream){
                         std::vector<Vertex> triangulated;
                         auto verts = currentPrimitive->GetVertices();
                         
-                        for(int i = 0; i < verts.size(); i+=4){
+                        for(size_t i = 0; i < verts.size(); i+=4){
                             triangulated.push_back(verts[i + 0]);
                             triangulated.push_back(verts[i + 1]);
                             triangulated.push_back(verts[i + 2]);
@@ -613,15 +620,15 @@ Model::Model(bStream::CStream& stream){
         return material;
     });
 
-    for(int i = 0; i < mMaterialTexturePairs.size(); i++){
-        for(int j = 0; j < mMaterialTexturePairs[i].second.mNumMaterials; j++){
+    for(size_t i = 0; i < mMaterialTexturePairs.size(); i++){
+        for(size_t j = 0; j < mMaterialTexturePairs[i].second.mNumMaterials; j++){
             uint8_t matIdx = stream.peekUInt8(modelOffset + materialsOffset + mMaterialTexturePairs[i].second.mIndexOffset + j);
             mMaterials[matIdx].second->mTextureName = mMaterialTexturePairs[i].first;
         }
     }
 
-    for(int i = 0; i < mMaterialPalettePairs.size(); i++){
-        for(int j = 0; j < mMaterialPalettePairs[i].second.mNumMaterials; j++){
+    for(size_t i = 0; i < mMaterialPalettePairs.size(); i++){
+        for(size_t j = 0; j < mMaterialPalettePairs[i].second.mNumMaterials; j++){
             uint8_t matIdx = stream.peekUInt8(modelOffset + materialsOffset + mMaterialPalettePairs[i].second.mIndexOffset + j);
             mMaterials[matIdx].second->mPaletteName = mMaterialPalettePairs[i].first;
         }
@@ -642,7 +649,7 @@ Model::Model(bStream::CStream& stream){
 
 void Material::Bind(){
     glUniformMatrix3x2fv(glGetUniformLocation(mProgram, "texMatrix"), 1, 0, &mTexMatrix[0][0]);
-    glBindTextureUnit(0, mTexture);
+    if(mTexture != 0) glBindTextureUnit(0, mTexture);
 }
 
 Material::~Material(){
@@ -653,140 +660,7 @@ Material::~Material(){
 
 }
 
-namespace TEX0 {
-
-Texture::Texture(bStream::CStream& stream, uint32_t texDataOffset){
-    std::cout << "Reading Texture at " << std::hex << stream.tell() << std::endl;
-    uint32_t params = stream.readUInt32();
-    mFormat = (params >> 26) & 0x07;
-    mWidth = 8 << ((params >> 20) & 0x07);
-    mHeight = 8 << ((params >> 23) & 0x07);
-    mColor0 = ((params >> 29) & 0x01);
-
-    mDataOffset = (params & 0xFFFF) << 3;
-
-    size_t pos = stream.tell();
-    std::cout << "Reading texture at " << texDataOffset << " + " << mDataOffset << " = " << stream.tell() << std::endl;
-
-    stream.seek(mDataOffset + texDataOffset);
-    mImgData.resize(mWidth * mHeight);
-    std::fill(mImgData.begin(), mImgData.end(), 0);
-
-    if(mFormat == 0x03){
-        for (size_t y = 0; y < mHeight; y++){
-            for(size_t x = 0; x < mWidth; x+=4){
-                uint16_t block = stream.readUInt16();
-                for(size_t bx = 0; bx < 4; bx++){
-                    uint16_t paletteIdx = block & 0x0F;
-                    uint32_t dst = ((y * mWidth) + x + bx);
-                    mImgData[dst] = paletteIdx;
-                    block >>= 4;
-                } 
-            }
-        }
-    } else if(mFormat == 0x02){
-        for (size_t y = 0; y < mHeight; y++){
-            for(size_t x = 0; x < mWidth; x+=8){
-                uint16_t block = stream.readUInt16();
-                for(size_t bx = 0; bx < 4; bx++){
-                    uint16_t paletteIdx = block & 0x03;
-                    uint32_t dst = ((y * mWidth) + x + bx);
-                    mImgData[dst] = paletteIdx;
-                    block >>= 2;
-                } 
-            }
-        }
-    } else if(mFormat == 0x02){
-        for (size_t y = 0; y < mHeight; y++){
-            for(size_t x = 0; x < mWidth; x++){
-                uint32_t dst = ((y * mWidth) + x);
-                
-                uint16_t block = stream.readUInt8();
-
-                uint16_t paletteIdx = (block & 0x1F) << 1;
-                uint16_t alpha = cv3To8(block >> 5);
-                
-                mImgData[dst] = (paletteIdx << 16) | alpha;
-            }
-        }
-    }
-
-    stream.seek(pos);
-}
-
-uint32_t Texture::Convert(Palette p){
-    uint32_t mTexture = 0;
-    glGenTextures(1, &mTexture);
-    glBindTexture(GL_TEXTURE_2D, mTexture);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-    std::vector<uint8_t> image;
-    image.resize(mWidth * mHeight * 4);
-
-    for (size_t y = 0; y < mHeight; y++){
-        for(size_t x = 0; x < mWidth; x++){
-            uint32_t src = ((y * mWidth) + x);
-            uint32_t dst = ((y * mWidth) + x) * 4;
-            if(mFormat == 0x03 || mFormat == 0x02){
-                image[dst]   = p.GetColors()[mImgData[src]].r;
-                image[dst+1] = p.GetColors()[mImgData[src]].g;
-                image[dst+2] = p.GetColors()[mImgData[src]].b;
-                image[dst+3] = mImgData[src] == 0 ? (mColor0 ? 0x00 : 0xFF) : 0xFF;
-            } else if(mFormat == 0x01){
-                image[dst]   = p.GetColors()[mImgData[src] >> 16].r;
-                image[dst+1] = p.GetColors()[mImgData[src] >> 16].g;
-                image[dst+2] = p.GetColors()[mImgData[src] >> 16].b;
-                image[dst+3] = mImgData[src] & 0x0000FFFF;
-            }
-        }
-    }
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, mWidth, mHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data());
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    return mTexture;
-
-}
-
-Palette::Palette(bStream::CStream& stream, uint32_t paletteDataOffset, uint32_t paletteDataSize){
-    uint32_t paletteOffset = (stream.readUInt16() << 3) + paletteDataOffset;
-    stream.skip(2);
-
-    size_t listPos = stream.tell();
-    
-    size_t tempPos = listPos;
-    uint32_t nextPaletteOffset = (stream.peekUInt16(tempPos) << 3) + paletteDataOffset;
-    while(nextPaletteOffset == paletteOffset){
-        nextPaletteOffset = (stream.peekUInt16(tempPos+=2) << 3) + paletteDataOffset;
-    }
-
-    if(nextPaletteOffset > paletteDataOffset + paletteDataSize || nextPaletteOffset < paletteOffset){
-        nextPaletteOffset = paletteDataOffset + paletteDataSize;
-    }
-
-
-    mColorCount = (nextPaletteOffset - paletteOffset) >> 1;
-    std::cout << "Current Palette Offset is 0x" << std::hex << paletteOffset << " Next Palette Offset is 0x" << nextPaletteOffset << " color count is " << mColorCount << std::endl; 
-    stream.seek(paletteOffset);
-
-    for(int i = 0; i < mColorCount; i++){
-        glm::vec3 color;
-        uint16_t pentry = stream.readUInt16();
-        color.r = cv5To8(pentry & 0x1F);
-        color.g = cv5To8((pentry >> 5) & 0x1F);
-        color.b = cv5To8((pentry >> 10) & 0x1F);
-        mColors.push_back(color);
-    }
-
-    stream.seek(listPos);
-
-}
-
-}
+namespace Formats {
 
 void NSBMD::Render(glm::mat4 v){
     if(mReady){
@@ -825,61 +699,12 @@ void NSBMD::Load(bStream::CStream& stream){
 
         switch (stamp){
             case 0x304C444D: {  // MDL0, why is this the wrong way???? '0LDM'
-                stream.readUInt32(); // section size
-                std::cout << "Reading model list at " << std::hex << stream.tell() << std::endl;
-                mModels = Nitro::ReadList<std::shared_ptr<MDL0::Model>>(stream, [&](bStream::CStream& stream){
-                    uint32_t offset = stream.readUInt32();
-                    size_t listPos = stream.tell();
-
-                    stream.seek(sectionOffset + offset);
-
-                    std::shared_ptr<MDL0::Model> model = std::make_shared<MDL0::Model>(stream);
-
-                    stream.seek(listPos);
-                    return model;
-                });
-
+                MDL0::Parse(stream, sectionOffset, mModels);
                 break;
             }
 
             case 0x30584554: { // TEX0 
-                stream.readUInt32(); // section size 0x04
-                stream.skip(4); //0x08
-
-                uint16_t textureDataSize = stream.readUInt16(); //0x0C
-                uint16_t textureListOffset = stream.readUInt16(); //0x0E
-                stream.skip(4);
-                uint32_t textureDataOffset = stream.readUInt32(); //0x14
-                stream.skip(4); //padding //0x18
-
-                uint16_t cmpTexDataSize = stream.readUInt16() << 3; //0x1C
-                uint32_t cmpTexInfoOffset = stream.readUInt16(); // 0x1E
-                stream.skip(4); // padding 0x20
-                
-                uint32_t cmpTexDataOffset = stream.readUInt32(); //0x24
-                uint32_t cmpTexInfoDataOffset = stream.readUInt32(); // 0x28 huh?
-                stream.skip(4); // 0x2C
-
-                uint32_t paletteDataSize = stream.readUInt32() << 3; //30
-                uint32_t paletteDictOffset = stream.readUInt16(); //34
-                stream.skip(2);
-                uint32_t paletteDataOffset = stream.readUInt32(); //
-
-                stream.seek(sectionOffset + paletteDictOffset);
-                mPalettes = Nitro::ReadList<std::shared_ptr<TEX0::Palette>>(stream, [&](bStream::CStream& stream){
-                    std::shared_ptr<TEX0::Palette> palette = std::make_shared<TEX0::Palette>(stream, paletteDataOffset + sectionOffset, paletteDataSize);
-                    return palette;
-                });
-
-                stream.seek(sectionOffset + textureListOffset);
-                std::cout << "Reading Texture List at " << std::hex << sectionOffset << " " << textureListOffset << std::endl;
-                mTextures = Nitro::ReadList<std::shared_ptr<TEX0::Texture>>(stream, [&](bStream::CStream& stream){
-                    std::shared_ptr<TEX0::Texture> texture = std::make_shared<TEX0::Texture>(stream, textureDataOffset + sectionOffset);
-                    stream.readUInt32(); // wuh?
-                    return texture;
-                });
-                
-
+                TEX0::Parse(stream, sectionOffset, mTextures, mPalettes);
                 break;   
             }
 
@@ -905,16 +730,22 @@ void NSBMD::Load(bStream::CStream& stream){
     mReady = true;
 }
 
-void NSBMD::Dump(){
 
+void NSBMD::AttachNSBTX(NSBTX* nsbtx){
+    // Copy materials and palettes from nsbtx to nsbmd
+    mTextures = nsbtx->GetTextures();
+    mPalettes = nsbtx->GetPalettes();
+
+    // Attach textures same way original model does
+    for(auto [name, model] : mModels.Items()){
+        for(auto [name, material] : model->GetMaterials().Items()){
+            std::cout << "Attaching Texture " << material->mTextureName << " with palette " << material->mPaletteName << std::endl;
+            if(mTextures.contains(material->mTextureName) && mPalettes.contains(material->mPaletteName)){
+                material->SetTexture(mTextures[material->mTextureName]->Convert(*mPalettes[material->mPaletteName]));
+            }
+        }
+    }
 }
 
-NSBMD::NSBMD(){
-
 }
-
-NSBMD::~NSBMD(){
-
-}
-
 }
