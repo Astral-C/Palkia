@@ -162,6 +162,8 @@ void Primitive::Render(){
     } else if(mType == PrimitiveType::Tristrips || mType == PrimitiveType::Quadstrips){
         glDrawArrays(GL_TRIANGLE_STRIP, 0, mVertices.size());
     }
+
+    glBindVertexArray(0);
 }
 
 void Mesh::Render(){
@@ -649,12 +651,12 @@ Model::Model(bStream::CStream& stream){
 
 void Material::Bind(){
     glUniformMatrix3x2fv(glGetUniformLocation(mProgram, "texMatrix"), 1, 0, &mTexMatrix[0][0]);
-    if(mTexture != 0) glBindTextureUnit(0, mTexture);
+    glBindTextureUnit(0, mTexture);
 }
 
 Material::~Material(){
     if(mTexture != 0){
-        glDeleteTextures(1, &mTexture);
+        //glDeleteTextures(1, &mTexture);
     }
 }
 

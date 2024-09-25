@@ -19,6 +19,3 @@ pybind11_add_module(PalkiaPy main.cpp)
 target_include_directories(PalkiaPy PUBLIC ../include ../lib pybind11/pybind11)
 
 target_link_libraries(PalkiaPy PUBLIC palkia pybind11::embed)
-
-# Build as 'PalkiaPy' but rename to 'Palkia' afterwards to avoid naming conflicts during the build.
-set_target_properties(PalkiaPy PROPERTIES OUTPUT_NAME palkia)

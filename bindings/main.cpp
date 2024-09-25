@@ -2,6 +2,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#define BSTREAM_IMPLEMENTATION
 #include <bstream/bstream.h>
 #include <NDS/Assets/NSBMD.hpp>
 #include <NDS/Assets/NSBTX.hpp>
@@ -15,9 +16,15 @@ using namespace py::literals;
 static bool init = false;
 static glm::mat4 viewMtx = {}, projMtx = {}, camMtx = {};
 
+void CatchGLErrors(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
+	std::cout << "[Palkia GL Error]: " << message << std::endl;
+}
+
 bool InitPalkia(){
     if(!init){
         if(gladLoadGL()){
+            glEnable(GL_DEBUG_OUTPUT);
+            glDebugMessageCallback(CatchGLErrors, nullptr);
             init = true;
             return true;
         }
@@ -53,7 +60,7 @@ std::shared_ptr<Palkia::Formats::NSBMD> LoadNSBMD(std::string path){
         return nullptr;
     }
 
-    bStream::CFileStream modelStream(path, bStream::Endianess::Big, bStream::OpenMode::In);
+    bStream::CFileStream modelStream(path, bStream::Endianess::Little, bStream::OpenMode::In);
     
     std::shared_ptr<Palkia::Formats::NSBMD> modelData = std::make_shared<Palkia::Formats::NSBMD>();
     modelData->Load(modelStream);
@@ -66,12 +73,41 @@ std::shared_ptr<Palkia::Formats::NSBMD> LoadNSBMD(py::bytes data){
 
     py::buffer_info dataInfo(py::buffer(data).request());
 
-    bStream::CMemoryStream modelStream((uint8_t*)dataInfo.ptr, dataInfo.size, bStream::Endianess::Big, bStream::OpenMode::In);
+    bStream::CMemoryStream modelStream((uint8_t*)dataInfo.ptr, dataInfo.size, bStream::Endianess::Little, bStream::OpenMode::In);
     
     std::shared_ptr<Palkia::Formats::NSBMD> modelData = std::make_shared<Palkia::Formats::NSBMD>();
     modelData->Load(modelStream);
 
     return modelData;
+}
+
+std::shared_ptr<Palkia::Formats::NSBTX> LoadNSBTX(std::string path){
+    if(!init) return nullptr;
+
+    if(!std::filesystem::exists(path)){
+        std::cout << "Couldn't load textures " << path << std::endl;
+        return nullptr;
+    }
+
+    bStream::CFileStream stream(path, bStream::Endianess::Little, bStream::OpenMode::In);
+    
+    std::shared_ptr<Palkia::Formats::NSBTX> data = std::make_shared<Palkia::Formats::NSBTX>();
+    data->Load(stream);
+
+    return data;
+}
+
+std::shared_ptr<Palkia::Formats::NSBTX> LoadNSBTX(py::bytes data){
+    if(!init) return nullptr;
+
+    py::buffer_info dataInfo(py::buffer(data).request());
+
+    bStream::CMemoryStream stream((uint8_t*)dataInfo.ptr, dataInfo.size, bStream::Endianess::Little, bStream::OpenMode::In);
+    
+    std::shared_ptr<Palkia::Formats::NSBTX> txdata = std::make_shared<Palkia::Formats::NSBTX>();
+    txdata->Load(stream);
+
+    return txdata;
 }
 
 /*
@@ -88,8 +124,8 @@ void setScale(std::shared_ptr<J3DModelInstance> instance, float x, float y, floa
 }
 */
 
-void renderModel(std::shared_ptr<Palkia::Formats::NSBMD> model){
-    model->Render(camMtx);
+void renderModel(std::shared_ptr<Palkia::Formats::NSBMD> model, std::vector<float> mtx){
+    model->Render(camMtx * glm::make_mat4(mtx.data()));
 }
 
 void attachNSBTX(std::shared_ptr<Palkia::Formats::NSBMD> model, std::shared_ptr<Palkia::Formats::NSBTX> texture){
@@ -120,8 +156,8 @@ void ResizePickingFB(uint32_t w, uint32_t h){
 //    }
 //}
 
-PYBIND11_MODULE(J3DUltra, m) {
-    m.doc() = "Palkia";
+PYBIND11_MODULE(PalkiaPy, m) {
+    m.doc() = "An NDS Asset Library";
 
     py::class_<glm::vec3>(m, "Vec3")
         .def(py::init([](){ return glm::vec3(0.0); }))
@@ -160,9 +196,11 @@ PYBIND11_MODULE(J3DUltra, m) {
         .def("attachNSBTX", &attachNSBTX)
     ;
     
-    m.def("load", py::overload_cast<std::string>(&LoadNSBMD), "Load NSBMD from filepath", py::kw_only(), py::arg("path"));
-    m.def("load", py::overload_cast<py::bytes>(&LoadNSBMD), "Load NSBMD from bytes object", py::kw_only(), py::arg("data"));
+    m.def("loadNSBMD", py::overload_cast<std::string>(&LoadNSBMD), "Load NSBMD from filepath", py::kw_only(), py::arg("path"));
+    m.def("loadNSBMD", py::overload_cast<py::bytes>(&LoadNSBMD), "Load NSBMD from bytes object", py::kw_only(), py::arg("data"));
    
+    m.def("loadNSBTX", py::overload_cast<std::string>(&LoadNSBTX), "Load NSBTX from filepath", py::kw_only(), py::arg("path"));
+    m.def("loadNSBTX", py::overload_cast<py::bytes>(&LoadNSBTX), "Load NSBTX from bytes object", py::kw_only(), py::arg("data"));
     
     m.def("init", &InitPalkia, "Setup Palkia for Model Loading and Rendering");
     m.def("cleanup", &CleanupPalkia, "Cleanup Palkia Library");
