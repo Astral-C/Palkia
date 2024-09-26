@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(starforge)
+project(palkia)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -20,8 +20,7 @@ file(GLOB_RECURSE PALKIA_SOURCE
 )
 
 add_library(palkia ${PALKIA_SOURCE})
-target_include_directories(include lib lib/glm lib/bstream)
-target_include_directories(palkia PUBLIC include lib lib/glm lib/bstream)
+target_include_directories(palkia PUBLIC include "${PROJECT_SOURCE_DIR}/lib" lib/glm)
 target_link_libraries(palkia PUBLIC GL)
 
 #add_subdirectory(bindings)

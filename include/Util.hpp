@@ -1,7 +1,7 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 #include <cstdint>
-#include <bstream.h>
+#include "bstream/bstream.h"
 #include <functional>
 #include <vector>
 #include <unordered_map>
