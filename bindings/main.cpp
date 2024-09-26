@@ -9,6 +9,7 @@
 
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
+#include <memory>
 
 namespace py = pybind11;
 using namespace py::literals;

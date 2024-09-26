@@ -23,4 +23,4 @@ add_library(palkia ${PALKIA_SOURCE})
 target_include_directories(palkia PUBLIC include lib lib/glm lib/bstream)
 target_link_libraries(palkia PUBLIC GL)
 
-add_subdirectory(bindings)
+#add_subdirectory(bindings)
