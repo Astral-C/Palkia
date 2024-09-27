@@ -8,6 +8,7 @@ void File::SetData(uint8_t* data, size_t size){
 		delete[] mData;
 	}
 
+	mSize = size;
 	mData = new uint8_t[size];
 	memcpy(mData, data, size);
 }

@@ -55,18 +55,18 @@ Rom::Rom(std::filesystem::path p){
 		romFile.seek(mHeader.FNTOffset);
 		mFS.mRoot = mFS.ParseFNT(romFile, mHeader.FNTSize, files);
 
-		//romFile.seek(mHeader.arm9RomOff);
-		//uint8_t* arm9Data = new uint8_t[mHeader.arm9Size];
+		romFile.seek(mHeader.arm9RomOff);
+		uint8_t* arm9Data = new uint8_t[mHeader.arm9Size];
 
-		//romFile.readBytesTo(arm9Data, mHeader.arm9Size);
+		romFile.readBytesTo(arm9Data, mHeader.arm9Size);
 
-		//auto arm9 = File::Create();
-		//arm9->SetName("arm9.bin");
-		//arm9->SetData(arm9Data, mHeader.arm9Size);
+		auto arm9 = File::Create();
+		arm9->SetName("arm9.bin");
+		arm9->SetData(arm9Data, mHeader.arm9Size);
 
-		//mFS.mRoot->AddFile(arm9);
+		mFS.mRoot->AddFile(arm9);
 
-		//delete[] arm9Data;
+		delete[] arm9Data;
 	} else {
 		std::printf("File %s not found.\n", p.filename().c_str());
 	}
