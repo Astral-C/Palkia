@@ -37,34 +37,36 @@ void Rom::GetRawIcon(Color out[32][32]){
 
 Rom::Rom(std::filesystem::path p){
 	if(std::filesystem::exists(p)){
-		bStream::CFileStream romFile(p.relative_path(), bStream::Endianess::Little, bStream::OpenMode::In);
+		bStream::CFileStream romFile(p, bStream::Endianess::Little, bStream::OpenMode::In);
 		mHeader = romFile.readStruct<RomHeader>();
 		romFile.seek(mHeader.iconBannerOffset, false);
 		mBanner = romFile.readStruct<Banner>();
 
+		std::cout << "Reading FAT at " << std::hex << mHeader.FATOffset << std::dec << std::endl;
 		romFile.seek(mHeader.FATOffset);
 		std::vector<std::shared_ptr<File>> files;
 		int id = 0;
 		for(auto file : mFS.ParseFAT(romFile, (mHeader.FATSize / 8) - 1)){
 			files.push_back(File::Load(romFile, id++, file.first, file.second));
 		}
+		std::cout << "Loaded " << files.size() << " Files" << std::endl;
 
-
+		std::cout << "Reading FNT at " << std::hex << mHeader.FNTOffset << std::dec << std::endl;
 		romFile.seek(mHeader.FNTOffset);
 		mFS.mRoot = mFS.ParseFNT(romFile, mHeader.FNTSize, files);
 
-		romFile.seek(mHeader.arm9RomOff);
-		uint8_t* arm9Data = new uint8_t[mHeader.arm9Size];
+		//romFile.seek(mHeader.arm9RomOff);
+		//uint8_t* arm9Data = new uint8_t[mHeader.arm9Size];
 
-		romFile.readBytesTo(arm9Data, mHeader.arm9Size);
+		//romFile.readBytesTo(arm9Data, mHeader.arm9Size);
 
-		auto arm9 = File::Create();
-		arm9->SetName("arm9.bin");
-		arm9->SetData(arm9Data, mHeader.arm9Size);
+		//auto arm9 = File::Create();
+		//arm9->SetName("arm9.bin");
+		//arm9->SetData(arm9Data, mHeader.arm9Size);
 
-		mFS.mRoot->AddFile(arm9);
+		//mFS.mRoot->AddFile(arm9);
 
-		delete[] arm9Data;
+		//delete[] arm9Data;
 	} else {
 		std::printf("File %s not found.\n", p.filename().c_str());
 	}
