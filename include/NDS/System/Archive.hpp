@@ -9,7 +9,7 @@ private:
     FileSystem mFS;
 
 public:
-    size_t GetFileCount();
+    size_t GetFileCount() { return mFS.mFiles.size(); }
     std::shared_ptr<File> GetFileByIndex(size_t index);
     void Dump();
     Archive(bStream::CStream& stream);

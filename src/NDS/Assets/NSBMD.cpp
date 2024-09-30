@@ -656,7 +656,7 @@ void Material::Bind(){
 
 Material::~Material(){
     if(mTexture != 0){
-        //glDeleteTextures(1, &mTexture);
+        glDeleteTextures(1, &mTexture);
     }
 }
 
@@ -680,7 +680,7 @@ void NSBMD::Render(glm::mat4 v){
 }
 
 void NSBMD::Load(bStream::CStream& stream){
-    stream.readUInt32(); // stamp
+    if(stream.readUInt32() != 0x30444D42) return; // stamp
     stream.readUInt16(); // byte order
 
     stream.readUInt16(); // ver
