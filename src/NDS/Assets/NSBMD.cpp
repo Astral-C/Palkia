@@ -41,18 +41,19 @@ const char* default_frg_shader_source = "#version 460\n\
     \
     uniform sampler2D texSampler;\n\
     uniform mat3x2 texMatrix;\n\
+    uniform uint selectColor;\n\
     layout(location = 0) in vec2 fragTexCoord;\n\
     layout(location = 1) in vec3 fragVtxColor;\n\
     \
     layout(location = 0) out vec4 outColor;\n\
-    layout(location = 1) out int outPick;\n\
+    layout(location = 1) out uint outPick;\n\
     \
     void main()\n\
     {\n\
         vec4 texel = texture(texSampler, (texMatrix * vec3(fragTexCoord, 0)).xy );\n\
         outColor = texel * vec4(fragVtxColor.xyz, 0.5);\n\
         if(outColor.a < 1.0 / 255.0) discard;\n\
-        outPick = 1;\n\
+        outPick = selectColor;\n\
     }\
 ";
 
@@ -664,7 +665,7 @@ Material::~Material(){
 
 namespace Formats {
 
-void NSBMD::Render(glm::mat4 v){
+void NSBMD::Render(glm::mat4 v, uint32_t id){
     if(mReady){
         if(mProgram == 0xFFFFFFFF){
             InitShaders();
@@ -672,6 +673,7 @@ void NSBMD::Render(glm::mat4 v){
 
         glUseProgram(mProgram);
         glUniformMatrix4fv(glGetUniformLocation(mProgram, "transform"), 1, 0, &v[0][0]);
+        glUniform1ui(glGetUniformLocation(mProgram, "selectColor"), id);
 
         for(auto [name, model] : mModels.Items()){
             model->Render();

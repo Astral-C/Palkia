@@ -137,7 +137,7 @@ class NSBMD {
 public:
     void AttachNSBTX(NSBTX* nsbtx);
 
-    void Render(glm::mat4 v);
+    void Render(glm::mat4 v, uint32_t);
     void Load(bStream::CStream& stream);
 
     NSBMD(){}
