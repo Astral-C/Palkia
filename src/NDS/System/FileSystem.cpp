@@ -172,18 +172,25 @@ std::vector<std::pair<uint32_t, uint32_t>> FileSystem::ParseFAT(bStream::CStream
 }
 
 void FileSystem::WriteDirectory(bStream::CStream& strm, std::shared_ptr<Folder> dir){
-	strm.writeUInt32(dir->mID);
+	strm.writeUInt32(dir->mID * 0x08);
 	if(dir->mFiles.size() > 0){
 		strm.writeUInt16(dir->mFiles[0]->GetID());
 	} else {
 		strm.writeUInt16(0); // not sure this is right behavior
 	}
 
-	for (size_t d = 0; d < dir->mFolders.size(); d++){
-		//strm.seek();
+	strm.seek(dir->mID *= 0x08);
+	for (uint32_t d = 0; d < dir->mFolders.size(); d++){
+		uint8_t nameLen = (dir->mFolders[d]->mName.size() & 0x7F) | 0x80;
+		strm.writeString(dir->mFolders[d]->mName);
+		strm.writeUInt16(0); // offset
 	}
-	
 
+	for (uint32_t f = 0; f < dir->mFiles.size(); f++){
+		uint8_t nameLen = 0x00 | (dir->mFiles[f]->GetName().size() & 0x7F);
+		strm.writeString(dir->mFiles[f]->GetName());
+		strm.writeUInt16(dir->mFiles[f]->GetID());
+	}	
 }
 
 
