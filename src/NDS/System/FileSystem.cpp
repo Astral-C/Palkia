@@ -179,7 +179,7 @@ void FileSystem::WriteDirectory(bStream::CStream& strm, std::shared_ptr<Folder> 
 		strm.writeUInt16(0); // not sure this is right behavior
 	}
 
-	strm.seek(dir->mID *= 0x08);
+	strm.seek(dir->mID * 0x08);
 	for (uint32_t d = 0; d < dir->mFolders.size(); d++){
 		uint8_t nameLen = (dir->mFolders[d]->mName.size() & 0x7F) | 0x80;
 		strm.writeString(dir->mFolders[d]->mName);
@@ -190,7 +190,7 @@ void FileSystem::WriteDirectory(bStream::CStream& strm, std::shared_ptr<Folder> 
 		uint8_t nameLen = 0x00 | (dir->mFiles[f]->GetName().size() & 0x7F);
 		strm.writeString(dir->mFiles[f]->GetName());
 		strm.writeUInt16(dir->mFiles[f]->GetID());
-	}	
+	}
 }
 
 
