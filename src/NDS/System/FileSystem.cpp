@@ -1,5 +1,6 @@
 #include "Util.hpp"
 #include "NDS/System/FileSystem.hpp"
+#include <algorithm>
 
 namespace Palkia::Nitro {
 
@@ -43,7 +44,7 @@ void Folder::ForEachFile(std::function<void(std::shared_ptr<File>)> OnFile){
 void Folder::Traverse(std::function<void(std::shared_ptr<Folder>)> OnFolder, std::function<void(std::shared_ptr<File>)> OnFile){
 	OnFolder(GetPtr());
 	for (auto folder : mFolders){
-		folder->ForEachFile(OnFile);
+		folder->Traverse(OnFolder, OnFile);
 	}
 		
 	for (auto file : mFiles){
@@ -110,12 +111,16 @@ std::shared_ptr<File> FileSystem::GetFile(std::filesystem::path path){
     }
 }
 
-std::shared_ptr<Folder> FileSystem::ParseDirectory(bStream::CStream& strm, std::vector<std::shared_ptr<File>>& files, uint16_t id, std::string path){
+std::shared_ptr<Folder> FileSystem::ParseDirectory(bStream::CStream& strm, std::vector<std::shared_ptr<File>>& files, uint16_t id, std::string path, std::shared_ptr<Folder> parent){
 	std::shared_ptr<Folder> dir = std::make_shared<Folder>();
 	dir->mID = id;
 	dir->mName = path;
 	uint32_t dirOffset = strm.peekUInt32(id);
 	uint16_t fileId = strm.peekUInt16(id+4);
+
+	if(parent != nullptr){
+		dir->mParent = parent;
+	}
 
 	while(true){
 		uint8_t type = strm.peekUInt8(dirOffset++);
@@ -133,7 +138,7 @@ std::shared_ptr<Folder> FileSystem::ParseDirectory(bStream::CStream& strm, std::
 			uint16_t dirId = strm.peekUInt16(dirOffset);
 			dirOffset += 2;
 			uint16_t subdirOff = (dirId & 0x0FFF) * 0x08;
-			dir->mFolders.push_back(ParseDirectory(strm, files, subdirOff, name));
+			dir->mFolders.push_back(ParseDirectory(strm, files, subdirOff, name, dir));
 
 		} else {
 			if(fileId < files.size()){
@@ -159,7 +164,7 @@ std::shared_ptr<Folder> FileSystem::ParseDirectory(bStream::CStream& strm, std::
 std::shared_ptr<Folder> FileSystem::ParseFNT(bStream::CStream& strm, uint32_t fntSize, std::vector<std::shared_ptr<File>>& files){
 	bStream::CMemoryStream fntBuffer = bStream::CMemoryStream(fntSize, bStream::Endianess::Little, bStream::OpenMode::In);
 	strm.readBytesTo(fntBuffer.getBuffer(), fntSize);
-	return ParseDirectory(fntBuffer, files, 0, "");
+	return ParseDirectory(fntBuffer, files, 0, "", nullptr);
 }
 
 std::vector<std::pair<uint32_t, uint32_t>> FileSystem::ParseFAT(bStream::CStream& strm, uint32_t entryCount){
@@ -171,40 +176,57 @@ std::vector<std::pair<uint32_t, uint32_t>> FileSystem::ParseFAT(bStream::CStream
 	return files;
 }
 
-void FileSystem::WriteDirectory(bStream::CStream& strm, std::shared_ptr<Folder> dir){
-	strm.writeUInt32(strm.getSize() & 0x0FFF); // offset to dir data
-	if(dir->mFiles.size() > 0){
-		strm.writeUInt16(dir->mFiles[0]->GetID());
+void FileSystem::WriteDirectory(bStream::CStream& folderStream, bStream::CStream& dataStream, std::shared_ptr<Folder> dir){
+	if(dir->mParent.lock() != nullptr){
+		folderStream.writeUInt32(dataStream.tell() + folderStream.getSize() + 0x08); // offset to dir data
+		if(dir->mFolders.size() != 0){
+			folderStream.writeUInt16(dir->mFolders[0]->mID);
+		} else {
+			folderStream.writeUInt16(dir->mFiles[0]->GetID());
+		}
+		folderStream.writeUInt16(dir->mParent.lock()->mID | 0xF000);//dir->mParent.lock()->mID); // what???
 	} else {
-		strm.writeUInt16(0); // not sure this is right behavior
+		folderStream.writeUInt32(folderStream.getSize());
+		folderStream.writeUInt16(0);
+		uint32_t folderCount = 0;
+		dir->Traverse(
+			[&](std::shared_ptr<Folder> f){ folderCount += 1; },
+			[&](std::shared_ptr<File> f){}
+		);
+		std::cout << "Writing root folder count " << folderCount << std::endl;
+		folderStream.writeUInt16(folderCount);
 	}
 
-	uint32_t pos = strm.tell();
-	strm.seek(strm.getSize());
 	for (uint32_t d = 0; d < dir->mFolders.size(); d++){
-		uint8_t nameLen = (dir->mFolders[d]->mName.size() & 0x7F) | 0x80;
-		strm.writeString(dir->mFolders[d]->mName);
-		strm.writeUInt16(dir->mFolders[d]->mID); // offset
+		uint8_t nameLen = (dir->mFolders[d]->mName.size()) | 0x80;
+		dataStream.writeUInt8(nameLen);
+		dataStream.writeString(dir->mFolders[d]->mName);
+		dataStream.writeUInt16(dir->mFolders[d]->mID | 0xF000); // offset
 	}
 
 	for (uint32_t f = 0; f < dir->mFiles.size(); f++){
-		uint8_t nameLen = 0x00 | (dir->mFiles[f]->GetName().size() & 0x7F);
-		strm.writeString(dir->mFiles[f]->GetName());
-		strm.writeUInt16(dir->mFiles[f]->GetID());
+		uint8_t nameLen = 0x00 | (dir->mFiles[f]->GetName().size());
+		dataStream.writeUInt8(nameLen);
+		dataStream.writeString(dir->mFiles[f]->GetName());
 	}
-	strm.seek(pos);
 }
 
 
 uint32_t FileSystem::CalculateFNTSize(){
 	uint32_t fntSize = 0;
 
+	if(!mHasFNT){
+		return 0x08;
+	}
+
 	Traverse(
 		[&](std::shared_ptr<Folder> f){
-			fntSize += 9 + f->GetName().size();
+			//0x08 - size of folder table entry
+			//0x03 - size of subdir entry
+			fntSize += 0x08 + 0x03 + f->GetName().size();
 		},
 		[&](std::shared_ptr<File> f){
-			fntSize += 9 + f->GetName().size();
+			fntSize += 0x01 + f->GetName().size();
 		}
 	);
 
@@ -212,17 +234,44 @@ uint32_t FileSystem::CalculateFNTSize(){
 }
 
 void FileSystem::WriteFNT(bStream::CStream& strm){
-	if(!mHasFNT){
-		// write dummy FNT data
+	if(!mHasFNT){ // Write one dummy entry for a 'root' dir w/ all files
+		strm.writeUInt32(0x00000004);
+		strm.writeUInt32(0x00010000);
 		return;
 	}
 
-	// Calculate FNT Size
 
-	// Write the FNT
+	uint32_t dataSize = 0;
+	uint32_t headerSize = 0;
+	std::vector<std::shared_ptr<Folder>> flatFolders;
+	Traverse(
+		[&](std::shared_ptr<Folder> f){
+			flatFolders.push_back(f);
+			headerSize += 0x08;
+			dataSize += 0x03 + f->GetName().size();
+		},
+		[&](std::shared_ptr<File> f){
+			dataSize += 0x01 + f->GetName().size();
+		}
+	);
 
-	WriteDirectory(strm, mRoot);
+	std::sort(flatFolders.begin(), flatFolders.end(), [](std::shared_ptr<Folder> a, std::shared_ptr<Folder> b){ return a->mID < b->mID; });
 
+	uint8_t* folderHeaders = new uint8_t[headerSize]{0};
+	uint8_t* folderData = new uint8_t[dataSize]{0};
+
+	bStream::CMemoryStream folderStrm(folderHeaders, headerSize, bStream::Endianess::Little, bStream::OpenMode::Out);
+	bStream::CMemoryStream dataStrm(folderData, dataSize, bStream::Endianess::Little, bStream::OpenMode::Out);
+
+	for(auto f : flatFolders){
+		WriteDirectory(folderStrm, dataStrm, f);
+	}
+	
+	strm.writeBytes(folderHeaders, headerSize);
+	strm.writeBytes(folderData, dataSize);
+
+	delete[] folderHeaders;
+	delete[] folderData;
 }
 
 uint32_t FileSystem::CalculateFATSize(){
@@ -236,8 +285,13 @@ uint32_t FileSystem::CalculateFATSize(){
 }
 
 void FileSystem::WriteFAT(bStream::CStream& strm){
+	uint32_t fatOffset = 0x08;
 
+	ForEachFile([&](std::shared_ptr<File> f){
+		strm.writeUInt32(fatOffset);
+		strm.writeUInt32(fatOffset+PadTo32(f->GetSize()));
+		fatOffset += PadTo32(f->GetSize());
+	});
 }
-
 
 }

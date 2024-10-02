@@ -14,4 +14,8 @@ uint8_t s3tcBlend(uint8_t a, uint8_t b){
     return (((a << 1) + a) + ((b << 2) + b)) >> 3;
 }
 
+uint32_t PadTo32(uint32_t x){
+    return ((x + (32-1)) & ~(32-1));
+}
+
 }

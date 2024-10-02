@@ -84,6 +84,8 @@ class Rom {
 
 		std::shared_ptr<File> GetFile(std::filesystem::path);
 
+		FileSystem GetFS() { return mFS; }
+
 		void Dump();
 
 		Rom(std::filesystem::path);

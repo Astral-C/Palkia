@@ -107,7 +107,9 @@ private:
 	uint32_t mNextFileID { 0 };
 	std::shared_ptr<Folder> mRoot;
 	std::vector<std::shared_ptr<File>> mFiles; // only used when no FNT
-	std::shared_ptr<Folder> ParseDirectory(bStream::CStream& strm, std::vector<std::shared_ptr<File>>& files, uint16_t id, std::string path);
+	std::shared_ptr<Folder> ParseDirectory(bStream::CStream& strm, std::vector<std::shared_ptr<File>>& files, uint16_t id, std::string path, std::shared_ptr<Folder> parent);
+
+	void WriteDirectory(bStream::CStream& foldeStream, bStream::CStream& dataStream, std::shared_ptr<Folder> mDir);
 
 public:
 	void Traverse(std::function<void(std::shared_ptr<Folder>)> OnFolder, std::function<void(std::shared_ptr<File>)> OnFile);
@@ -124,7 +126,6 @@ public:
 
 	void WriteFNT(bStream::CStream& strm);
 	void WriteFAT(bStream::CStream& strm);
-	void WriteDirectory(bStream::CStream& strm, std::shared_ptr<Folder> mDir);
 
 	FileSystem();
 	~FileSystem();

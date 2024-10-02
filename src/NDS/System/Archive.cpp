@@ -31,23 +31,84 @@ std::shared_ptr<File> Archive::GetFileByIndex(size_t index){
 
 }
 
-Archive::Archive(bStream::CStream& stream){
+void Archive::SaveArchive(bStream::CStream& stream){
+    uint32_t fntSize = mFS.CalculateFNTSize();
+    uint32_t fatSize = mFS.CalculateFATSize();
+    uint32_t imgSize = 0;
 
+    mFS.ForEachFile([&](std::shared_ptr<File> f) { imgSize += PadTo32(f->GetSize()); });
+
+    fntSize = PadTo32(fntSize);
+    fatSize = PadTo32(fatSize);
+    imgSize = PadTo32(imgSize);
+
+    uint32_t archiveSize = 0x10 + 0x18 + fntSize + fatSize + imgSize;
+
+    uint8_t* fntData = new uint8_t[fntSize];
+    uint8_t* fatData = new uint8_t[fatSize];
+    uint8_t* imgData = new uint8_t[imgSize];
+
+    memset(fntData, 0, fntSize);
+    memset(fatData, 0, fatSize);
+    memset(imgData, 0, imgSize);
+
+    bStream::CMemoryStream fntStream(fntData, fntSize, bStream::Endianess::Little, bStream::OpenMode::Out);
+    bStream::CMemoryStream fatStream(fatData, fatSize, bStream::Endianess::Little, bStream::OpenMode::Out);
+    bStream::CMemoryStream imgStream(imgData, imgSize, bStream::Endianess::Little, bStream::OpenMode::Out);
+
+    mFS.WriteFNT(fntStream);
+    mFS.WriteFAT(fatStream);
+    mFS.ForEachFile([&](std::shared_ptr<File> f) {
+        imgStream.writeBytes(f->GetData(), f->GetSize());
+        for(int i = 0; i < (PadTo32(f->GetSize()) - f->GetSize()); i++){
+            imgStream.writeUInt8(0x00);
+        }
+    });
+
+    // Write NARC header
+    stream.writeUInt32(0x4352414E);
+    stream.writeUInt32(0x0100FFFE);
+    stream.writeUInt32(archiveSize);
+    stream.writeUInt16(0x10);
+    stream.writeUInt16(3);
+
+    // Write FAT header
+    stream.writeUInt32(0x46415442);
+    stream.writeUInt32(fatSize + 0x0C);
+    stream.writeUInt32(mFS.mFiles.size());
+    stream.writeBytes(fatData, fatSize);
+
+    // Write FNT header
+    stream.writeUInt32(0x464E5442);
+    stream.writeUInt32(fntSize + 0x08);
+    stream.writeBytes(fntData, fntSize);
+
+    // Write GMIF header
+    stream.writeUInt32(0x46494D47);
+    stream.writeUInt32(imgSize);
+    stream.writeBytes(imgData, imgSize);
+
+    delete[] fntData;
+    delete[] fatData;
+    delete[] imgData;
+}
+
+Archive::Archive(bStream::CStream& stream){
 	stream.seek(0x10);
     stream.readUInt32(); // BTAF
-    uint32_t fatSize = stream.readUInt32(); // section size
-    uint32_t fileCount = stream.readUInt32(); // file count
+    uint32_t fatSize = stream.readUInt32(); // section size 0x00
+    uint32_t fileCount = stream.readUInt32(); // file count 0x08
     size_t fatOffset = stream.tell();
 
     stream.seek(fatSize + 0x10);
-    stream.readUInt32(); // BTNF
-    uint32_t fntSize = stream.readUInt32(); // section size
+    stream.readUInt32(); // BTNF 0x0C
+    uint32_t fntSize = stream.readUInt32(); // section size //0x10
     size_t fntOffset = stream.tell();
 
     stream.seek(fatSize + fntSize + 0x10);
 
-    stream.readUInt32(); // GMIF
-    stream.readUInt32(); // section size
+    stream.readUInt32(); // GMIF 0x14
+    stream.readUInt32(); // section size 0x18
     uint32_t imgOffset = stream.tell();
 
     stream.seek(fatOffset);
