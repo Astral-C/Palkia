@@ -260,11 +260,41 @@ void FileSystem::WriteFNT(bStream::CStream& strm){
 	uint8_t* folderHeaders = new uint8_t[headerSize]{0};
 	uint8_t* folderData = new uint8_t[dataSize]{0};
 
-	bStream::CMemoryStream folderStrm(folderHeaders, headerSize, bStream::Endianess::Little, bStream::OpenMode::Out);
-	bStream::CMemoryStream dataStrm(folderData, dataSize, bStream::Endianess::Little, bStream::OpenMode::Out);
+	bStream::CMemoryStream folderStream(folderHeaders, headerSize, bStream::Endianess::Little, bStream::OpenMode::Out);
+	bStream::CMemoryStream dataStream(folderData, dataSize, bStream::Endianess::Little, bStream::OpenMode::Out);
 
 	for(auto f : flatFolders){
-		WriteDirectory(folderStrm, dataStrm, f);
+		//write header
+		if(f == flatFolders.front()){
+			folderStream.writeUInt32(headerSize);
+			folderStream.writeUInt16(0);
+			folderStream.writeUInt16(flatFolders.size()-1);
+		} else {
+			folderStream.writeUInt32(headerSize + dataStream.tell());
+			if(f->mFiles.size() > 0){
+				folderStream.writeUInt16(f->mFiles[0]->GetID());
+			} else {
+				folderStream.writeUInt16(0);
+			}
+			folderStream.writeUInt16(f->mParent.lock()->mID | 0xF000);
+		}
+
+		// write data
+		for (uint32_t d = 0; d < f->mFolders.size(); d++){
+			uint8_t nameLen = (f->mFolders[d]->mName.size()) | 0x80;
+			dataStream.writeUInt8(nameLen);
+			dataStream.writeString(f->mFolders[d]->mName);
+			dataStream.writeUInt16(f->mFolders[d]->mID | 0xF000); // offset
+		}
+
+		for (uint32_t fl = 0; fl < f->mFiles.size(); fl++){
+			uint8_t nameLen = 0x00 | (f->mFiles[fl]->GetName().size());
+			dataStream.writeUInt8(nameLen);
+			dataStream.writeString(f->mFiles[fl]->GetName());
+		}
+
+		dataStream.writeUInt8(0);
+
 	}
 	
 	strm.writeBytes(folderHeaders, headerSize);
