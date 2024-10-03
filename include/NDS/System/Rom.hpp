@@ -11,7 +11,7 @@
 namespace Palkia::Nitro {
 
 #pragma pack(push,1)
-typedef struct RomHeader{
+typedef struct RomHeader {
 	char romID[12];
 	char gameCode[4];
 	char makerCode[2];
@@ -53,7 +53,17 @@ typedef struct RomHeader{
 	uint32_t arm7AutoLoad;
 
 	uint64_t secureDisable;
-	//TODO: finish this
+	uint32_t totalUsedRom;
+	uint32_t romHeaderSize;
+	uint8_t reserved2[0x38];
+	uint8_t nintendoLogoData[0x9C];
+	uint16_t nintendoLogoChecksum;
+	uint16_t headerChecksum;
+	uint32_t debugRomOffset;
+	uint32_t debugRomSize;
+	uint32_t debugRamAddress;
+	uint32_t reserved3;
+	uint8_t reserved4[0x90];
 } RomHeader;
 
 typedef struct NitroBanner {
@@ -72,12 +82,29 @@ typedef struct NitroBanner {
 } Banner;
 #pragma pack(pop)
 
+struct Overlay {
+	uint32_t ramAddress;
+	uint32_t ramSize;
+	uint32_t bssSize;
+	uint32_t staticInitStart;
+	uint32_t staticInitEnd;
+	uint32_t compressedSize;
+	uint32_t flags;
+	std::weak_ptr<File> file;
+};
 
 class Rom {
 	private:
 		RomHeader mHeader;
 		Banner mBanner;
 		FileSystem mFS;
+
+		std::vector<Overlay> mOverlays7;
+		std::vector<Overlay> mOverlays9;
+
+		// this contains things like arm9 as  files
+		std::shared_ptr<Folder> mRomFiles = nullptr;
+
 	public:
 		RomHeader GetHeader();
 		Banner GetBanner();
@@ -89,6 +116,7 @@ class Rom {
 		void Dump();
 
 		Rom(std::filesystem::path);
+		void Save(std::filesystem::path);
 		void GetRawIcon(Color out[32][32]);
 
 		~Rom();

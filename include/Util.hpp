@@ -29,6 +29,7 @@ uint8_t cv3To8(uint8_t v);
 uint8_t cv5To8(uint8_t v);
 uint8_t s3tcBlend(uint8_t a, uint8_t b);
 uint32_t PadTo32(uint32_t x);
+uint32_t Pad(uint32_t x, uint32_t y);
 
 namespace Nitro {
 

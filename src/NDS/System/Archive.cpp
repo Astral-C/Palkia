@@ -1,5 +1,6 @@
 #include "NDS/System/Archive.hpp"
 #include "Util.hpp"
+#include <algorithm>
 
 namespace Palkia::Nitro {
 
@@ -36,7 +37,7 @@ void Archive::SaveArchive(bStream::CStream& stream){
     uint32_t fatSize = mFS.CalculateFATSize();
     uint32_t imgSize = 0;
 
-    mFS.ForEachFile([&](std::shared_ptr<File> f) { imgSize += PadTo32(f->GetSize()); });
+    mFS.ForEachFile([&](std::shared_ptr<File> f) { imgSize += f->GetSize(); });
 
     fntSize = PadTo32(fntSize);
     fatSize = PadTo32(fatSize);
@@ -56,14 +57,21 @@ void Archive::SaveArchive(bStream::CStream& stream){
     bStream::CMemoryStream fatStream(fatData, fatSize, bStream::Endianess::Little, bStream::OpenMode::Out);
     bStream::CMemoryStream imgStream(imgData, imgSize, bStream::Endianess::Little, bStream::OpenMode::Out);
 
+    // calling write FNT will reset all IDs! it MUST be called FIRST
     mFS.WriteFNT(fntStream);
     mFS.WriteFAT(fatStream);
-    mFS.ForEachFile([&](std::shared_ptr<File> f) {
-        imgStream.writeBytes(f->GetData(), f->GetSize());
-        for(int i = 0; i < (PadTo32(f->GetSize()) - f->GetSize()); i++){
-            imgStream.writeUInt8(0x00);
-        }
-    });
+
+	std::vector<std::shared_ptr<File>> files = {};
+
+	mFS.ForEachFile([&](std::shared_ptr<File> f){
+		files.push_back(f);
+	});
+	
+	std::sort(files.begin(), files.end(), [](std::shared_ptr<File> a, std::shared_ptr<File> b){ return a->GetID() < b->GetID(); });
+    
+    for(int i = 0; i < files.size(); i++){
+        imgStream.writeBytes(files[i]->GetData(), files[i]->GetSize());
+    }
 
     // Write NARC header
     stream.writeUInt32(0x4352414E);
@@ -75,7 +83,7 @@ void Archive::SaveArchive(bStream::CStream& stream){
     // Write FAT header
     stream.writeUInt32(0x46415442);
     stream.writeUInt32(fatSize + 0x0C);
-    stream.writeUInt32(mFS.mFiles.size());
+    stream.writeUInt32(files.size());
     stream.writeBytes(fatData, fatSize);
 
     // Write FNT header

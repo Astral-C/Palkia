@@ -74,12 +74,14 @@ public:
 
 	void SetParent(std::shared_ptr<Folder> parent) { mParent = parent; }
 
-
+	void SetName(std::string n) { mName = n; }
 	std::string GetName() { return mName; }
 	std::shared_ptr<File> GetFile(std::filesystem::path);
 
 	void AddFile(std::shared_ptr<File> file);
 	
+	void AddFolder(std::shared_ptr<Folder> folder);
+
 	void Dump(std::filesystem::path out_path);
 
 	static std::shared_ptr<Folder> Create(std::shared_ptr<FileSystem> fs) { return std::make_shared<Folder>(fs); }
@@ -125,7 +127,7 @@ public:
 	uint32_t CalculateFATSize();
 
 	void WriteFNT(bStream::CStream& strm);
-	void WriteFAT(bStream::CStream& strm);
+	void WriteFAT(bStream::CStream& strm,uint32_t startOffset=0);
 
 	FileSystem();
 	~FileSystem();
