@@ -81,8 +81,8 @@ Rom::Rom(std::filesystem::path p){
 		arm9->SetData(arm9Data, mHeader.arm9Size);
 
 		auto arm7 = File::Create();
-		arm9->SetName("arm7.bin");
-		arm9->SetData(arm7Data, mHeader.arm7Size);
+		arm7->SetName("arm7.bin");
+		arm7->SetData(arm7Data, mHeader.arm7Size);
 
 		auto debugRom = File::Create();
 		debugRom->SetName("debug.nds");
@@ -189,8 +189,8 @@ void Rom::Save(std::filesystem::path p){
 
 	// start on the rom specific stuff
 
-	uint32_t headerSize = Pad(sizeof(RomHeader), 0x4000);
-	for(uint32_t i = 0; i < headerSize; i++) romFile.writeUInt8(0xFF);
+	for(uint32_t i = 0; i < sizeof(RomHeader); i++) romFile.writeUInt8(0x00);
+	for(uint32_t i = 0; i < Pad(sizeof(RomHeader), 0x4000); i++) romFile.writeUInt8(0xFF);
 
 
 	mHeader.arm9RomOff = romFile.tell();
@@ -267,18 +267,19 @@ void Rom::Save(std::filesystem::path p){
 
 	for(uint32_t i = 0; i < Pad(romFile.tell(), 0x200); i++) romFile.writeUInt8(0xFF);
 
+	mHeader.FATOffset = romFile.tell();
+	mHeader.FATSize = fatSize;
+
 	romFile.writeUInt32(0x46415442);
     romFile.writeUInt32(fatSize + 0x0C);
     romFile.writeUInt32(files.size());
     romFile.writeBytes(fatData, fatSize);
 
-	mHeader.FATOffset = romFile.tell();
-	mHeader.FATSize = fatSize;
 
 	for(uint32_t i = 0; i < Pad(romFile.tell(), 0x200); i++) romFile.writeUInt8(0xFF);
 
 	mHeader.iconBannerOffset = romFile.tell();
-	romFile.writeBytes((uint8_t*)&mBanner, sizeof(mBanner));
+	romFile.writeBytes((uint8_t*)&mBanner, sizeof(mBanner));//stupid fuckin broken banner
 
 	for(uint32_t i = 0; i < Pad(romFile.tell(), 0x200); i++) romFile.writeUInt8(0xFF);
 
@@ -299,6 +300,9 @@ void Rom::Save(std::filesystem::path p){
 
 	romFile.seek(mHeader.FATOffset);
 	mFS.WriteFAT(romFile, fileOffset);
+
+	romFile.seek(0);
+	romFile.writeBytes((uint8_t*)&mHeader, sizeof(mHeader)); 
 
     delete[] fntData;
     delete[] fatData;

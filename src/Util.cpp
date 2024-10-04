@@ -19,7 +19,7 @@ uint32_t PadTo32(uint32_t x){
 }
 
 uint32_t Pad(uint32_t x, uint32_t y){
-    return ((x + (y-1)) & ~(y-1));
+    return ((x % y) != 0 ? y - (x % y) : 0);
 }
 
 
