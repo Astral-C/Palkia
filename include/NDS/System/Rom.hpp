@@ -68,26 +68,31 @@ typedef struct RomHeader {
 
 typedef struct NitroBanner {
 	uint16_t version;
-	uint16_t crc16;
-	char reserved[0x1C];
+	uint16_t crc16_part1;
+	uint16_t crc16_part2;
+	uint16_t crc16_part3;
+	uint16_t crc16_part4;
+	char reserved[0x16];
 	uint8_t iconBitmap[0x200];
 	uint16_t iconPalette[0x10];
 
-	char japaneseTitle[0x100];
-	char englishTitle[0x100];
-	char frenchTitle[0x100];
-	char germanTitle[0x100];
-	char italianTitle[0x100];
-	char spanishTitle[0x100];
+	uint8_t japaneseTitle[0x100];
+	uint8_t englishTitle[0x100];
+	uint8_t frenchTitle[0x100];
+	uint8_t germanTitle[0x100];
+	uint8_t italianTitle[0x100];
+	uint8_t spanishTitle[0x100];
 } Banner;
 #pragma pack(pop)
 
 struct Overlay {
+	uint32_t overlayID;
 	uint32_t ramAddress;
 	uint32_t ramSize;
 	uint32_t bssSize;
 	uint32_t staticInitStart;
 	uint32_t staticInitEnd;
+	uint32_t fileID;
 	uint32_t compressedSize;
 	uint32_t flags;
 	std::weak_ptr<File> file;
@@ -101,6 +106,10 @@ class Rom {
 
 		std::vector<Overlay> mOverlays7;
 		std::vector<Overlay> mOverlays9;
+
+		bool mHasSig { false };
+		std::array<uint8_t, 0x88> mRsaSig;
+		std::array<uint32_t, 3> mNitroFooter; // no idea what this is supposed to be
 
 		// this contains things like arm9 as  files
 		std::shared_ptr<Folder> mRomFiles = nullptr;
