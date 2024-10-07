@@ -28,13 +28,13 @@ public:
 	uint16_t GetID() { return mID; }
 	void SetName(std::string name) { mName = name; }
 
-	void SetData(uint8_t* data, size_t size);
+	void SetData(uint8_t* data, std::size_t size);
 
 	std::string GetName() { return mName; }
 
 	static std::shared_ptr<File> Create() { return std::make_shared<File>(); }
 
-    static std::shared_ptr<File> Load(bStream::CStream& strm, uint16_t id, uint32_t start, uint32_t end){
+    static std::shared_ptr<File> Load(bStream::CStream& strm, uint32_t id,  uint32_t start, uint32_t end){
         std::shared_ptr<File> f = std::make_shared<File>();
 
 		f->mName = std::format("{}.bin", id);
@@ -78,7 +78,7 @@ public:
 	std::string GetName() { return mName; }
 	std::shared_ptr<File> GetFile(std::filesystem::path);
 
-	void AddFile(std::shared_ptr<File> file);
+	std::shared_ptr<File> AddFile(std::shared_ptr<File> file);
 	
 	void AddFolder(std::shared_ptr<Folder> folder);
 

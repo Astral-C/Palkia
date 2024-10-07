@@ -14,8 +14,9 @@ void File::SetData(uint8_t* data, size_t size){
 	memcpy(mData, data, size);
 }
 
-void Folder::AddFile(std::shared_ptr<File> file){
+std::shared_ptr<File> Folder::AddFile(std::shared_ptr<File> file){
 	mFiles.push_back(file);
+	return mFiles.back();
 }
 
 void Folder::AddFolder(std::shared_ptr<Folder> folder){
@@ -174,7 +175,7 @@ std::shared_ptr<Folder> FileSystem::ParseFNT(bStream::CStream& strm, uint32_t fn
 
 std::vector<std::pair<uint32_t, uint32_t>> FileSystem::ParseFAT(bStream::CStream& strm, uint32_t entryCount){
 	std::vector<std::pair<uint32_t, uint32_t>> files = {};
-	for (size_t f = 0; f < entryCount; f++){
+	for (std::size_t f = 0; f < entryCount; f++){
 		files.push_back({strm.readUInt32(),strm.readUInt32()});
 	}
 
@@ -197,14 +198,14 @@ void FileSystem::WriteDirectory(bStream::CStream& folderStream, bStream::CStream
 		folderStream.writeUInt16((folderStream.getSize() / 0x08) + 1);
 	}
 
-	for (uint32_t d = 0; d < dir->mFolders.size(); d++){
+	for (std::size_t d = 0; d < dir->mFolders.size(); d++){
 		uint8_t nameLen = dir->mFolders[d]->mName.size() | 0x80;
 		dataStream.writeUInt8(nameLen);
 		dataStream.writeString(dir->mFolders[d]->mName);
 		dataStream.writeUInt16(dir->mFolders[d]->mID | 0xF000); // offset
 	}
 
-	for (uint32_t f = 0; f < dir->mFiles.size(); f++){
+	for (std::size_t f = 0; f < dir->mFiles.size(); f++){
 		uint8_t nameLen = dir->mFiles[f]->GetName().size();
 		dataStream.writeUInt8(nameLen);
 		dataStream.writeString(dir->mFiles[f]->GetName());
@@ -300,7 +301,7 @@ void FileSystem::WriteFAT(bStream::CStream& strm, uint32_t startOffset){
 	
 	std::sort(files.begin(), files.end(), [](std::shared_ptr<File> a, std::shared_ptr<File> b){ return a->GetID() < b->GetID(); });
 
-	for(int i = 0; i < files.size(); i++){
+	for(std::size_t i = 0; i < files.size(); i++){
 		strm.writeUInt32(fatOffset + startOffset);
 		strm.writeUInt32(fatOffset+PadTo32(files[i]->GetSize()) + startOffset);
 		fatOffset += PadTo32(files[i]->GetSize());

@@ -69,7 +69,7 @@ void Archive::SaveArchive(bStream::CStream& stream){
 	
 	std::sort(files.begin(), files.end(), [](std::shared_ptr<File> a, std::shared_ptr<File> b){ return a->GetID() < b->GetID(); });
     
-    for(int i = 0; i < files.size(); i++){
+    for(std::size_t i = 0; i < files.size(); i++){
         imgStream.writeBytes(files[i]->GetData(), files[i]->GetSize());
     }
 
