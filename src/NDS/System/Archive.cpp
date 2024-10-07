@@ -37,7 +37,7 @@ void Archive::SaveArchive(bStream::CStream& stream){
     uint32_t fatSize = mFS.CalculateFATSize();
     uint32_t imgSize = 0;
 
-    mFS.ForEachFile([&](std::shared_ptr<File> f) { imgSize += f->GetSize(); });
+    mFS.ForEachFile([&](std::shared_ptr<File> f) { imgSize += PadTo32(f->GetSize()); });
 
     fntSize = PadTo32(fntSize);
     fatSize = PadTo32(fatSize);
@@ -71,6 +71,8 @@ void Archive::SaveArchive(bStream::CStream& stream){
     
     for(std::size_t i = 0; i < files.size(); i++){
         imgStream.writeBytes(files[i]->GetData(), files[i]->GetSize());
+        uint32_t paddedSize = PadTo32(imgStream.tell()); 
+        while(imgStream.tell() < paddedSize) imgStream.writeUInt8(0);
     }
 
     // Write NARC header

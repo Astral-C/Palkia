@@ -37,6 +37,8 @@ public:
     static std::shared_ptr<File> Load(bStream::CStream& strm, uint32_t id,  uint32_t start, uint32_t end){
         std::shared_ptr<File> f = std::make_shared<File>();
 
+		f->mID = id;
+
 		f->mName = std::format("{}.bin", id);
 		f->mData = new uint8_t[end - start];
 		f->mSize = end - start;
@@ -127,7 +129,7 @@ public:
 	uint32_t CalculateFATSize();
 
 	void WriteFNT(bStream::CStream& strm);
-	void WriteFAT(bStream::CStream& strm,uint32_t startOffset=0);
+	void WriteFAT(bStream::CStream& strm);
 
 	FileSystem();
 	~FileSystem();

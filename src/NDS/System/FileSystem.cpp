@@ -290,8 +290,8 @@ uint32_t FileSystem::CalculateFATSize(){
 	return fatSize;
 }
 
-void FileSystem::WriteFAT(bStream::CStream& strm, uint32_t startOffset){
-	uint32_t fatOffset = 0x08;
+void FileSystem::WriteFAT(bStream::CStream& strm){
+	uint32_t fatOffset = 0x00;
 
 	std::vector<std::shared_ptr<File>> files = {};
 
@@ -302,8 +302,8 @@ void FileSystem::WriteFAT(bStream::CStream& strm, uint32_t startOffset){
 	std::sort(files.begin(), files.end(), [](std::shared_ptr<File> a, std::shared_ptr<File> b){ return a->GetID() < b->GetID(); });
 
 	for(std::size_t i = 0; i < files.size(); i++){
-		strm.writeUInt32(fatOffset + startOffset);
-		strm.writeUInt32(fatOffset+PadTo32(files[i]->GetSize()) + startOffset);
+		strm.writeUInt32(fatOffset);
+		strm.writeUInt32(fatOffset + PadTo32(files[i]->GetSize()));
 		fatOffset += PadTo32(files[i]->GetSize());
 	}
 
