@@ -128,7 +128,6 @@ Rom::Rom(std::filesystem::path p){
 		}
 
 		if(mHeader.arm7OverlayOffset != 0){
-			uint32_t maxOverlayFile = 0;
 			romFile.seek(mHeader.arm7OverlayOffset);
 			mOverlays7.resize(mHeader.arm7OverlaySize / 32);
 			for(std::size_t i = 0; i < mHeader.arm7OverlaySize; i += 32){
