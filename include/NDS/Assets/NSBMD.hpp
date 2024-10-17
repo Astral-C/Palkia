@@ -79,7 +79,8 @@ namespace MDL0 {
     public:
         std::string mTextureName, mPaletteName;
 
-        void SetTexture(uint32_t t) { mTexture = t; }
+        void SetTexture(std::vector<uint8_t>& t, uint32_t w, uint32_t h);
+        void SetTextureIdx(uint32_t t){ mTexture = t; }
 
         void Bind();
 
@@ -133,6 +134,7 @@ class NSBMD {
     Nitro::ResourceDict<std::shared_ptr<MDL0::Model>> mModels;
     Nitro::ResourceDict<std::shared_ptr<TEX0::Texture>> mTextures;
     Nitro::ResourceDict<std::shared_ptr<TEX0::Palette>> mPalettes;
+    std::map<std::pair<std::string, std::string>, uint32_t> mLoadedTexturePairs = {};
     
 public:
     void AttachNSBTX(NSBTX* nsbtx);

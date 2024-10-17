@@ -40,7 +40,7 @@ void Parse(bStream::CStream& stream, uint32_t offset, Nitro::ResourceDict<std::s
     });
 
     stream.seek(offset + textureListOffset);
-    std::cout << "Reading Texture List at " << std::hex << offset << " " << textureListOffset << std::endl;
+    //std::cout << "Reading Texture List at " << std::hex << offset << " " << textureListOffset << std::endl;
     textures = Nitro::ReadList<std::shared_ptr<Texture>>(stream, [&](bStream::CStream& stream){
         std::shared_ptr<Texture> texture = std::make_shared<Texture>(stream, textureDataOffset + offset);
         stream.readUInt32(); // wuh?
@@ -49,7 +49,7 @@ void Parse(bStream::CStream& stream, uint32_t offset, Nitro::ResourceDict<std::s
 }
 
 Texture::Texture(bStream::CStream& stream, uint32_t texDataOffset){
-    std::cout << "Reading Texture at " << std::hex << stream.tell() << std::endl;
+    //std::cout << "Reading Texture at " << std::hex << stream.tell() << std::endl;
     uint32_t params = stream.readUInt32();
     mFormat = (params >> 26) & 0x07;
     mWidth = 8 << ((params >> 20) & 0x07);
@@ -59,7 +59,7 @@ Texture::Texture(bStream::CStream& stream, uint32_t texDataOffset){
     mDataOffset = (params & 0xFFFF) << 3;
 
     size_t pos = stream.tell();
-    std::cout << "Reading texture at " << texDataOffset << " + " << mDataOffset << " = " << stream.tell() << std::endl;
+    //std::cout << "Reading texture at " << texDataOffset << " + " << mDataOffset << " = " << stream.tell() << std::endl;
 
     stream.seek(mDataOffset + texDataOffset);
     mImgData.resize(mWidth * mHeight);
@@ -152,16 +152,7 @@ Texture::Texture(bStream::CStream& stream, uint32_t texDataOffset){
     stream.seek(pos);
 }
 
-uint32_t Texture::Convert(Palette p){
-    uint32_t mTexture = 0;
-    glGenTextures(1, &mTexture);
-    glBindTexture(GL_TEXTURE_2D, mTexture);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
+std::vector<uint8_t> Texture::Convert(Palette p){
     std::vector<uint8_t> image;
     image.resize(mWidth * mHeight * 4);
 
@@ -196,11 +187,7 @@ uint32_t Texture::Convert(Palette p){
         }
     }
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, mWidth, mHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data());
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    return mTexture;
-
+    return image;
 }
 
 Palette::Palette(bStream::CStream& stream, uint32_t paletteDataOffset, uint32_t paletteDataSize){
@@ -221,7 +208,7 @@ Palette::Palette(bStream::CStream& stream, uint32_t paletteDataOffset, uint32_t 
 
 
     mColorCount = (nextPaletteOffset - paletteOffset) >> 1;
-    std::cout << "Current Palette Offset is 0x" << std::hex << paletteOffset << " Next Palette Offset is 0x" << nextPaletteOffset << " color count is " << mColorCount << std::endl; 
+    //std::cout << "Current Palette Offset is 0x" << std::hex << paletteOffset << " Next Palette Offset is 0x" << nextPaletteOffset << " color count is " << mColorCount << std::endl; 
     stream.seek(paletteOffset);
 
     for(size_t i = 0; i < mColorCount; i++){
@@ -320,8 +307,8 @@ void NSBTX::Load(bStream::CStream& stream){
         uint32_t returnOffset = stream.tell();
         stream.seek(sectionOffset);
 
-        std::cout << "Reading Segment at " << std::hex << stream.tell() << std::endl;
-        std::cout << "Stamp is " << stream.peekString(stream.tell(), 4) << std::endl;
+        //std::cout << "Reading Segment at " << std::hex << stream.tell() << std::endl;
+        //std::cout << "Stamp is " << stream.peekString(stream.tell(), 4) << std::endl;
         uint32_t stamp = stream.readUInt32();
 
         switch (stamp){

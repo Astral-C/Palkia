@@ -38,7 +38,7 @@ namespace TEX0 {
         uint32_t GetHeight() { return mHeight; }
         Texture(bStream::CStream&, uint32_t);
 
-        uint32_t Convert(Palette p);
+        std::vector<uint8_t> Convert(Palette p);
         
         void Bind();
 

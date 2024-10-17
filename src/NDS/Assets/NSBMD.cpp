@@ -76,7 +76,7 @@ void InitShaders(){
         int32_t infoLogLength;
         glGetShaderiv(vs, GL_INFO_LOG_LENGTH, &infoLogLength);
         glGetShaderInfoLog(vs, infoLogLength, NULL, glErrorLogBuffer);
-        printf("[NSBMD Loader]: Compile failure in mdl vertex shader:\n%s\n", glErrorLogBuffer);
+        //printf("[NSBMD Loader]: Compile failure in mdl vertex shader:\n%s\n", glErrorLogBuffer);
     }
     glCompileShader(fs);
     glGetShaderiv(fs, GL_COMPILE_STATUS, &status);
@@ -84,7 +84,7 @@ void InitShaders(){
         int32_t infoLogLength;
         glGetShaderiv(fs, GL_INFO_LOG_LENGTH, &infoLogLength);
         glGetShaderInfoLog(fs, infoLogLength, NULL, glErrorLogBuffer);
-        printf("[NSBMD Loader]: Compile failure in mdl fragment shader:\n%s\n", glErrorLogBuffer);
+        //printf("[NSBMD Loader]: Compile failure in mdl fragment shader:\n%s\n", glErrorLogBuffer);
     }
     mProgram = glCreateProgram();
     glAttachShader(mProgram, vs);
@@ -95,7 +95,7 @@ void InitShaders(){
         int32_t logLen; 
         glGetProgramiv(mProgram, GL_INFO_LOG_LENGTH, &logLen); 
         glGetProgramInfoLog(mProgram, logLen, NULL, glErrorLogBuffer); 
-        printf("[NSBMD Loader]: Shader Program Linking Error:\n%s\n", glErrorLogBuffer);
+        //printf("[NSBMD Loader]: Shader Program Linking Error:\n%s\n", glErrorLogBuffer);
     } 
     glDetachShader(mProgram, vs);
     glDetachShader(mProgram, fs);
@@ -107,7 +107,7 @@ namespace MDL0 {
 
 void Parse(bStream::CStream& stream, uint32_t offset, Nitro::ResourceDict<std::shared_ptr<MDL0::Model>>& models){
     stream.readUInt32(); // section size
-    std::cout << "Reading model list at " << std::hex << stream.tell() << std::endl;
+    //std::cout << "Reading model list at " << std::hex << stream.tell() << std::endl;
     models = Nitro::ReadList<std::shared_ptr<MDL0::Model>>(stream, [&](bStream::CStream& stream){
         uint32_t modelOffset = stream.readUInt32();
         size_t listPos = stream.tell();
@@ -302,7 +302,7 @@ RenderCommand::RenderCommand(bStream::CStream& stream){
 
 Mesh::Mesh(bStream::CStream& stream){
     size_t meshStart = stream.tell();
-    std::cout << "Reading Mesh at " << std::hex << meshStart << std::endl;
+    //std::cout << "Reading Mesh at " << std::hex << meshStart << std::endl;
     stream.readUInt16(); // dummy
     stream.readUInt16(); // size
     stream.readUInt32(); // unk
@@ -313,7 +313,7 @@ Mesh::Mesh(bStream::CStream& stream){
     stream.seek(commandsOffset);
 
     size_t pos = stream.tell();
-    std::cout << "Reading Geometry Commands at " << std::hex << pos << std::endl;
+    //std::cout << "Reading Geometry Commands at " << std::hex << pos << std::endl;
     std::shared_ptr<Primitive> currentPrimitive = std::make_shared<Primitive>();
     currentPrimitive->SetType(PrimitiveType::None);
     
@@ -479,7 +479,7 @@ Mesh::Mesh(bStream::CStream& stream){
                     break;
 
                 default:
-                    std::cout << "Uknown GPU Command 0x" << std::hex << cmds[c] << std::endl;
+                    //std::cout << "Uknown GPU Command 0x" << std::hex << cmds[c] << std::endl;
                     break;
 
             }
@@ -541,7 +541,7 @@ Material::Material(bStream::CStream& stream){
 
 Model::Model(bStream::CStream& stream){
     size_t modelOffset = stream.tell();
-    std::cout << "Reading model at " << std::hex << stream.tell() << std::endl;
+    //std::cout << "Reading model at " << std::hex << stream.tell() << std::endl;
     stream.readUInt32(); // size of MDL0?
     uint32_t renderCMDOffset = stream.readUInt32(); 
     uint32_t materialsOffset = stream.readUInt32();
@@ -574,7 +574,7 @@ Model::Model(bStream::CStream& stream){
     stream.skip(8);
 
     stream.seek(meshesOffset + modelOffset);
-    std::cout << "Reading mesh list at " << std::hex << stream.tell() << std::endl;
+    //std::cout << "Reading mesh list at " << std::hex << stream.tell() << std::endl;
     mMeshes = Nitro::ReadList<std::shared_ptr<Mesh>>(stream, [&](bStream::CStream& stream){
         uint32_t offset = stream.readUInt32();
         size_t listPos = stream.tell();
@@ -610,7 +610,7 @@ Model::Model(bStream::CStream& stream){
     });
 
     stream.seek(materialsOffset + modelOffset + sizeof(uint16_t) + sizeof(uint16_t));
-    std::cout << "Reading material list at " << std::hex << stream.tell() << std::endl;
+    //std::cout << "Reading material list at " << std::hex << stream.tell() << std::endl;
     mMaterials = Nitro::ReadList<std::shared_ptr<Material>>(stream, [&](bStream::CStream& stream){
         uint32_t offset = stream.readUInt32();
         size_t listPos = stream.tell();
@@ -655,6 +655,20 @@ void Material::Bind(){
     glBindTextureUnit(0, mTexture);
 }
 
+void Material::SetTexture(std::vector<uint8_t>& image, uint32_t w, uint32_t h){
+    glGenTextures(1, &mTexture);
+    glBindTexture(GL_TEXTURE_2D, mTexture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+}
+
 Material::~Material(){
     if(mTexture != 0){
         glDeleteTextures(1, &mTexture);
@@ -697,8 +711,8 @@ void NSBMD::Load(bStream::CStream& stream){
         uint32_t returnOffset = stream.tell();
         stream.seek(sectionOffset);
 
-        std::cout << "Reading Segment at " << std::hex << stream.tell() << std::endl;
-        std::cout << "Stamp is " << stream.peekString(stream.tell(), 4) << std::endl;
+        //std::cout << "Reading Segment at " << std::hex << stream.tell() << std::endl;
+        //std::cout << "Stamp is " << stream.peekString(stream.tell(), 4) << std::endl;
         uint32_t stamp = stream.readUInt32();
 
         switch (stamp){
@@ -724,9 +738,14 @@ void NSBMD::Load(bStream::CStream& stream){
     // Loop through materials & models to attach textures and palettes to materials - this also handles converting the texture - perhaps convert texture should return gl resource for loaded texture?
     for(auto [name, model] : mModels.Items()){
         for(auto [name, material] : model->GetMaterials().Items()){
-            std::cout << "Attaching Texture " << material->mTextureName << " with palette " << material->mPaletteName << std::endl;
-            if(mTextures.contains(material->mTextureName) && mPalettes.contains(material->mPaletteName)){
-                material->SetTexture(mTextures[material->mTextureName]->Convert(*mPalettes[material->mPaletteName]));
+            //std::cout << "Attaching Texture " << material->mTextureName << " with palette " << material->mPaletteName << std::endl;
+            if(mLoadedTexturePairs.contains({material->mTextureName, material->mPaletteName})){
+                material->SetTextureIdx(mLoadedTexturePairs[{material->mTextureName, material->mPaletteName}]);
+            } else {
+                if(mTextures.contains(material->mTextureName) && mPalettes.contains(material->mPaletteName)){
+                    auto tex = mTextures[material->mTextureName]->Convert(*mPalettes[material->mPaletteName]);
+                    material->SetTexture(tex, mTextures[material->mTextureName]->GetWidth(), mTextures[material->mTextureName]->GetHeight());
+                }
             }
         }
     }
@@ -743,9 +762,13 @@ void NSBMD::AttachNSBTX(NSBTX* nsbtx){
     // Attach textures same way original model does
     for(auto [name, model] : mModels.Items()){
         for(auto [name, material] : model->GetMaterials().Items()){
-            std::cout << "Attaching Texture " << material->mTextureName << " with palette " << material->mPaletteName << std::endl;
-            if(mTextures.contains(material->mTextureName) && mPalettes.contains(material->mPaletteName)){
-                material->SetTexture(mTextures[material->mTextureName]->Convert(*mPalettes[material->mPaletteName]));
+            if(mLoadedTexturePairs.contains({material->mTextureName, material->mPaletteName})){
+                material->SetTextureIdx(mLoadedTexturePairs[{material->mTextureName, material->mPaletteName}]);
+            } else {
+                if(mTextures.contains(material->mTextureName) && mPalettes.contains(material->mPaletteName)){
+                    auto tex = mTextures[material->mTextureName]->Convert(*mPalettes[material->mPaletteName]);
+                    material->SetTexture(tex, mTextures[material->mTextureName]->GetWidth(), mTextures[material->mTextureName]->GetHeight());
+                }
             }
         }
     }
