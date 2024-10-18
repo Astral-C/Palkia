@@ -10,6 +10,8 @@
 #include <format>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "pugixml/src/pugixml.hpp"
+
 namespace Palkia {
 
 const char* default_vtx_shader_source = "#version 460\n\
@@ -695,6 +697,18 @@ void NSBMD::Render(glm::mat4 v, uint32_t id){
     }
 }
 
+void NSBMD::LoadIMD(std::string path){
+    // load imd with pugixml and build out streams with it
+    pugi::xml_document imd;
+    if(!imd.load_file(path.c_str())){
+        return;
+    }
+
+    std::cout << "Generator: " << imd.child("imd").child("body").child("original_generator").attribute("name").as_string() << std::endl;
+
+    
+}
+
 void NSBMD::Load(bStream::CStream& stream){
     if(stream.readUInt32() != 0x30444D42) return; // stamp
     stream.readUInt16(); // byte order
@@ -773,6 +787,10 @@ void NSBMD::AttachNSBTX(NSBTX* nsbtx){
         }
     }
 }
+
+//void NSBMD::Save(bStream::CStream& stream){
+//
+//}
 
 }
 }

@@ -141,6 +141,8 @@ public:
 
     void Render(glm::mat4 v, uint32_t);
     void Load(bStream::CStream& stream);
+    void LoadIMD(std::string path);
+    void Save(bStream::CStream& stream);
 
     NSBMD(){}
     ~NSBMD(){}

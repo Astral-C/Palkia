@@ -9,6 +9,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive -Wall -Wformat-security -Wu
 
 project(palkia)
 
+add_subdirectory(lib/pugixml)
+
 add_compile_definitions(-DGLM_ENABLE_EXPERIMENTAL -DIMGUI_DEFINE_MATH_OPERATORS)
 
 
@@ -21,6 +23,6 @@ file(GLOB_RECURSE PALKIA_SOURCE
 
 add_library(palkia ${PALKIA_SOURCE})
 target_include_directories(palkia PUBLIC include "${PROJECT_SOURCE_DIR}/lib" lib/glm)
-target_link_libraries(palkia PUBLIC GL)
+target_link_libraries(palkia PUBLIC GL pugixml)
 
 #add_subdirectory(bindings)
