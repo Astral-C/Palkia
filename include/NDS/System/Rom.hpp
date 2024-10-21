@@ -13,7 +13,7 @@ namespace Palkia::Nitro {
 #pragma pack(push,1)
 typedef struct RomHeader {
 	char romID[12];
-	char gameCode[4];
+	uint32_t gameCode;
 	char makerCode[2];
 	uint8_t unitCode;
 	uint8_t encryptionSeedSelect;
@@ -108,6 +108,7 @@ class Rom {
 		std::vector<Overlay> mOverlays9;
 
 		bool mHasSig { false };
+		bool mArm9Compressed { false };
 		std::array<uint8_t, 0x88> mRsaSig;
 		std::array<uint32_t, 3> mNitroFooter; // no idea what this is supposed to be
 
