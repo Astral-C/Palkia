@@ -3,12 +3,14 @@
 #include <NDS/Assets/NSBTX.hpp>
 #include <NDS/Assets/NSBMD.hpp>
 #include <Util.hpp>
+#include <cstring>
 #include <string>
 #include <sstream>
 #include <fstream>
 #include <algorithm>
 #include <format>
 #include <glm/gtc/matrix_transform.hpp>
+#include <stringstream>
 
 #include "pugixml/src/pugixml.hpp"
 
@@ -106,6 +108,11 @@ void InitShaders(){
 }
 
 namespace MDL0 {
+
+std::vector<uint8_t> Generate(pugi::xml_node node){
+    std::shared_ptr<MDL0::Model> model = std::make_shared<MDL0::Model>(node);
+
+}
 
 void Parse(bStream::CStream& stream, uint32_t offset, Nitro::ResourceDict<std::shared_ptr<MDL0::Model>>& models){
     stream.readUInt32(); // section size
@@ -491,6 +498,10 @@ Mesh::Mesh(bStream::CStream& stream){
 
 }
 
+Mesh::Mesh(pugi::xml_node node){
+    
+}
+
 Material::Material(bStream::CStream& stream){
     stream.readUInt16(); //item tag     0x02
     stream.readUInt16(); // size        0x04
@@ -498,48 +509,121 @@ Material::Material(bStream::CStream& stream){
     mDiffAmb = stream.readUInt32(); //  0x08
     mSpeEmi = stream.readUInt32();  //  0x0C
     mPolygonAttr = stream.readUInt32(); // 0x10
-    uint32_t polygonAttrMask = stream.readUInt32(); // 0x14
+    mPolygonAttrMask = stream.readUInt32(); // 0x14
     mTexImgParams = stream.readUInt32(); // 0x18
-    uint32_t texImgParamsMask = stream.readUInt32(); //0x1C
-    uint16_t texturePaletteBase = stream.readUInt16(); 
-    uint16_t flag = stream.readUInt16();
+    mTexImgParamsMask = stream.readUInt32(); //0x1C
     
-    uint16_t oWidth = stream.readUInt16();
-    uint16_t oHeight = stream.readUInt16();
+    mTexturePaletteBase = stream.readUInt16(); 
+    mFlag = stream.readUInt16();
+    
+    mWidth = stream.readUInt16();
+    mHeight = stream.readUInt16();
 
-    int16_t magW = fixed(stream.readUInt32());
-    int16_t magH = fixed(stream.readUInt32());
+    mMagW = fixed(stream.readUInt32());
+    mMagH = fixed(stream.readUInt32());
 
 
-    float scaleU = 1.0f, scaleV = 1.0f, cosR = 1.0f, sinR = 0.0f, transU = 0.0f, transV = 0.0f;
     if(!(flag & 0x0002)){
-        scaleU = fixed(stream.readInt32());
-        scaleV = fixed(stream.readInt32());
+        mScaleU = fixed(stream.readInt32());
+        mScaleV = fixed(stream.readInt32());
     }
     
     if(!(flag & 0x0004)){
-        sinR = fixed(stream.readUInt32());
-        cosR = fixed(stream.readUInt32());
+        mSinR = fixed(stream.readUInt32());
+        mCosR = fixed(stream.readUInt32());
     }
 
     if(!(flag & 0x0008)){
-        transU = fixed(stream.readUInt32());
-        transV = fixed(stream.readUInt32());
+        mTransU = fixed(stream.readUInt32());
+        mTransV = fixed(stream.readUInt32());
     }
 
-    float texScaleU = 1.0f / (float)oWidth;
-    float texScaleV = 1.0f / (float)oHeight;
+    float texScaleU = 1.0f / (float)mWidth;
+    float texScaleV = 1.0f / (float)mHeight;
 
     mTexMatrix = {
-        texScaleU * scaleU * cosR,
-        texScaleU * scaleV * -sinR,
-        texScaleV * scaleU * sinR,
-        texScaleV * scaleV * cosR,
-        scaleU * ((-0.5f * cosR) - (0.5 * sinR - 0.5) - transU),
-        scaleV * ((-0.5f * cosR) + (0.5 * sinR - 0.5) + transV) + 1.0f
+        texScaleU * mScaleU * mCosR,
+        texScaleU * mScaleV * -mSinR,
+        texScaleV * mScaleU * mSinR,
+        texScaleV * mScaleV * mCosR,
+        mScaleU * ((-0.5f * mCosR) - (0.5 * mSinR - 0.5) - mTransU),
+        mScaleV * ((-0.5f * mCosR) + (0.5 * mSinR - 0.5) + mTransV) + 1.0f
     };
 
 }
+
+Material::Material(pugi::xml_node node){
+    std::string amb = std::string(node.attribute("ambient").as_string(def="0 0 0"));
+    std::string diff = std::string(node.attribute("diffuse").as_string(def="0 0 0"));
+    std::string emi = std::string(node.attribute("emission").as_string(def="0 0 0"));
+    std::string spec = std::string(node.attribute("specular").as_string(def="0 0 0"));
+
+    uint8_t r1, g1, b1, r2, g2, b2;
+    
+    std::sscanf(diff.c_str(), "%u %u %u", &r1, &g1, &b1);
+    std::sscanf(amb.c_str(), "%u %u %u", &r2, &g2, &b2);
+    mDiffAmb = (b1 | g1 >> 5 | r1 >> 10) | ((b2 | g2 >> 5 | r2 >> 10) >> 16);
+
+    std::sscanf(emi.c_str(), "%u %u %u", &r1, &g1, &b1);
+    std::sscanf(spec.c_str(), "%u %u %u", &r2, &g2, &b2);
+    mSpecEmi = (b1 | g1 >> 5 | r1 >> 10) | ((b2 | g2 >> 5 | r2 >> 10) >> 16);
+
+    std::string texTransStr = std::string(node.attribute("tex_translate").as_string(def="0.00 0.00"));    
+    std::string texScaleStr = std::string(node.attribute("tex_scale").as_string(def="1.00 1.00"));
+    std::string texRotateStr = std::string(node.attribute("tex_rotate").as_string(def="0.00"));
+
+    std::sscanf(texTransStr.c_str(), "%f %f", &mTransU, &mTransV);
+    std::sscanf(texScaleStr.c_str(), "%f %f", &mScaleU, &mScaleV);
+    std::sscanf(texRotateStr.c_str(), "%f", &mSinR); // fuck
+
+    std::basic_istringstream texWrapMode(std::string(node.attribute("tex_tiling").as_string(def="repeat repeat")));
+
+    std::string texWrapU, texWrapV;
+    std::getline(texWrapMode, texWrapU, ' ');
+    std::getline(texWrapMode, texWrapV, ' ');
+
+    mTexIdx = node.attribute("tex_image_idx").as_int(def=0);
+    mPalIdx = node.attribute("tex_palette_idx").as_int(def=0);
+}
+
+void Material::Write(bStream::CStream& stream){
+    stream.writeUInt16(0x0000); //item tag     0x02
+    stream.writeUInt16(0x0000); // size        0x04
+    
+    stream.writeUInt32(mDiffAmb); // = stream.readUInt32(); //  0x08
+    stream.writeUInt32(mSpeEmi); // = stream.readUInt32();  //  0x0C
+    stream.writeUInt32(mPolygonAttr); // = stream.readUInt32(); // 0x10
+    stream.writeUInt32(mPolygonAttrMask); // = stream.readUInt32(); // 0x14
+    
+    stream.write(mTexImgParams); // = stream.readUInt32(); // 0x18
+
+    stream.writeUInt32(mTexImgParamsMask); // = stream.readUInt32(); //0x1C
+    stream.writeUInt16(mTexturePaletteBase); // = stream.readUInt16(); 
+    stream.writeUInt32(mFlag); // = stream.readUInt16();
+    
+    stream.writeUInt16(mWidth); // = stream.readUInt16();
+    stream.writeUInt16(mHeight); // = stream.readUInt16();
+
+    stream.writeUInt32(mMagW * (1 << 12));//  = fixed(stream.readUInt32());
+    stream.writeUInt32(mMagH * (1 << 12));//  = fixed(stream.readUInt32());
+
+
+    if(!(flag & 0x0002)){
+        stream.writeUInt32(mScaleU * (1 << 12)); // = fixed(stream.readInt32());
+        stream.writeUInt32(mScaleV * (1 << 12)); // = fixed(stream.readInt32());
+    }
+    
+    if(!(flag & 0x0004)){
+        stream.writeUInt32(mSinR * (1 << 12)); // = fixed(stream.readUInt32());
+        stream.writeUInt32(mCosR * (1 << 12)); // = fixed(stream.readUInt32());
+    }
+
+    if(!(flag & 0x0008)){
+        stream.writeUInt32(mTransU * (1 << 12));// = fixed(stream.readUInt32());
+        stream.writeUInt32(mTransV * (1 << 12));// = fixed(stream.readUInt32());
+    }
+}
+
 
 Model::Model(bStream::CStream& stream){
     size_t modelOffset = stream.tell();
@@ -652,6 +736,23 @@ Model::Model(bStream::CStream& stream){
 	//glBindBufferRange(GL_UNIFORM_BUFFER, 0, mUbo, 0, sizeof(NSBMDUniformBufferObject));
 }
 
+Model::Model(pugi::xml_node node){
+    // Generate materials
+    for(pugi::xml_node material = modelNode.child("material_array").child("material").first_child(); material; material = material.next_sibling()){
+        mMaterials.mItems().push_back(std::make_shared<Material>(material));
+    }
+
+    std::vector<Mesh> meshes;
+    for(pugi::xml_node mesh = modelNode.child("polygon_array").child("polygon").first_child(); mesh; mesh = mesh.next_sibling()){
+        meshes.push_back(std::make_shared<Mesh>(mesh));
+    }
+
+}
+
+void Model::Write(bStream::CStream& stream){
+
+}
+
 void Material::Bind(){
     glUniformMatrix3x2fv(glGetUniformLocation(mProgram, "texMatrix"), 1, 0, &mTexMatrix[0][0]);
     glBindTextureUnit(0, mTexture);
@@ -706,7 +807,8 @@ void NSBMD::LoadIMD(std::string path){
 
     std::cout << "Generator: " << imd.child("imd").child("body").child("original_generator").attribute("name").as_string() << std::endl;
 
-    
+    //
+
 }
 
 void NSBMD::Load(bStream::CStream& stream){

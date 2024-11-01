@@ -6,6 +6,8 @@
 #include <memory>
 #include <NDS/Assets/NSBTX.hpp>
 
+#include "pugixml/src/pugixml.hpp"
+
 namespace Palkia {
 
 class NSBMD;
@@ -72,9 +74,22 @@ namespace MDL0 {
         uint32_t mDiffAmb;
         uint32_t mSpeEmi;
         uint32_t mPolygonAttr;
+        uint32_t mPolygonAttrMask;
         uint32_t mTexImgParams; // texwidth/height are duplicates?
         glm::mat3x2 mTexMatrix;
         uint32_t mTexture { 0 };
+
+        uint32-t mModulateMode { 0 };
+        uint32_t mTexIdx { 0xFFFFFFFF };
+        uint32_t mPalIdx { 0xFFFFFFFF };
+        uint16_t mWidth { 0 }, mHeight { 0 };
+        float mMagW, mMagH { 0.0f };
+
+        bool mUpdateTranslucentDepth { false };
+        bool mRender1pxPoly { false };
+        bool mClipFarPlane { false };
+
+        float mScaleU = 1.0f, mScaleV = 1.0f, mCosR = 1.0f, mSinR = 0.0f, mTransU = 0.0f, mTransV = 0.0f;
 
     public:
         std::string mTextureName, mPaletteName;
@@ -85,6 +100,7 @@ namespace MDL0 {
         void Bind();
 
         Material(){}
+        Material(pugi::xml_node node);
         Material(bStream::CStream&);
         ~Material();
     };
@@ -119,7 +135,10 @@ namespace MDL0 {
         void Dump();
         void Render();
 
+        void Write(bStream::CStream& stream);
+
         Model(){}
+        Model(pugi::xml_node node);
         Model(bStream::CStream& stream);
         ~Model(){}
     };
