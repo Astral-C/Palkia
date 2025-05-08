@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <format>
 #include <glm/gtc/matrix_transform.hpp>
-#include <stringstream>
+#include <sstream>
 
 #include "pugixml/src/pugixml.hpp"
 
@@ -111,7 +111,7 @@ namespace MDL0 {
 
 std::vector<uint8_t> Generate(pugi::xml_node node){
     std::shared_ptr<MDL0::Model> model = std::make_shared<MDL0::Model>(node);
-
+    return {};
 }
 
 void Parse(bStream::CStream& stream, uint32_t offset, Nitro::ResourceDict<std::shared_ptr<MDL0::Model>>& models){
@@ -511,29 +511,28 @@ Material::Material(bStream::CStream& stream){
     mPolygonAttr = stream.readUInt32(); // 0x10
     mPolygonAttrMask = stream.readUInt32(); // 0x14
     mTexImgParams = stream.readUInt32(); // 0x18
+    mTexImgParamsMask = stream.readUInt32(); //0x1C
+    mTexturePaletteBase = stream.readUInt16();
+    mFlag = stream.readUInt16();
 
-    uint32_t texImgParamsMask = stream.readUInt32(); //0x1C
-    uint16_t texturePaletteBase = stream.readUInt16();
-    uint16_t flag = stream.readUInt16();
-
-    uint16_t oWidth = stream.readUInt16();
-    uint16_t oHeight = stream.readUInt16();
+    mWidth = stream.readUInt16();
+    mHeight = stream.readUInt16();
 
     mMagW = fixed(stream.readUInt32());
     mMagH = fixed(stream.readUInt32());
 
 
-    if(!(flag & 0x0002)){
+    if(!(mFlag & 0x0002)){
         mScaleU = fixed(stream.readInt32());
         mScaleV = fixed(stream.readInt32());
     }
 
-    if(!(flag & 0x0004)){
+    if(!(mFlag & 0x0004)){
         mSinR = fixed(stream.readUInt32());
         mCosR = fixed(stream.readUInt32());
     }
 
-    if(!(flag & 0x0008)){
+    if(!(mFlag & 0x0008)){
         mTransU = fixed(stream.readUInt32());
         mTransV = fixed(stream.readUInt32());
     }
@@ -553,39 +552,40 @@ Material::Material(bStream::CStream& stream){
 }
 
 Material::Material(pugi::xml_node node){
-    std::string amb = std::string(node.attribute("ambient").as_string(def="0 0 0"));
-    std::string diff = std::string(node.attribute("diffuse").as_string(def="0 0 0"));
-    std::string emi = std::string(node.attribute("emission").as_string(def="0 0 0"));
-    std::string spec = std::string(node.attribute("specular").as_string(def="0 0 0"));
+    std::string amb = std::string(node.attribute("ambient").as_string("0 0 0"));
+    std::string diff = std::string(node.attribute("diffuse").as_string("0 0 0"));
+    std::string emi = std::string(node.attribute("emission").as_string("0 0 0"));
+    std::string spec = std::string(node.attribute("specular").as_string("0 0 0"));
 
     uint8_t r1, g1, b1, r2, g2, b2;
 
-    std::sscanf(diff.c_str(), "%u %u %u", &r1, &g1, &b1);
-    std::sscanf(amb.c_str(), "%u %u %u", &r2, &g2, &b2);
+    std::sscanf(diff.c_str(), "%hhu %hhu %hhu", &r1, &g1, &b1);
+    std::sscanf(amb.c_str(), "%hhu %hhu %hhu", &r2, &g2, &b2);
     mDiffAmb = (b1 | g1 >> 5 | r1 >> 10) | ((b2 | g2 >> 5 | r2 >> 10) >> 16);
 
-    std::sscanf(emi.c_str(), "%u %u %u", &r1, &g1, &b1);
-    std::sscanf(spec.c_str(), "%u %u %u", &r2, &g2, &b2);
-    mSpecEmi = (b1 | g1 >> 5 | r1 >> 10) | ((b2 | g2 >> 5 | r2 >> 10) >> 16);
+    std::sscanf(emi.c_str(), "%hhu %hhu %hhu", &r1, &g1, &b1);
+    std::sscanf(spec.c_str(), "%hhu %hhu %hhu", &r2, &g2, &b2);
+    mSpeEmi = (b1 | g1 >> 5 | r1 >> 10) | ((b2 | g2 >> 5 | r2 >> 10) >> 16);
 
-    std::string texTransStr = std::string(node.attribute("tex_translate").as_string(def="0.00 0.00"));
-    std::string texScaleStr = std::string(node.attribute("tex_scale").as_string(def="1.00 1.00"));
-    std::string texRotateStr = std::string(node.attribute("tex_rotate").as_string(def="0.00"));
+    std::string texTransStr = std::string(node.attribute("tex_translate").as_string("0.00 0.00"));
+    std::string texScaleStr = std::string(node.attribute("tex_scale").as_string("1.00 1.00"));
+    std::string texRotateStr = std::string(node.attribute("tex_rotate").as_string("0.00"));
 
     std::sscanf(texTransStr.c_str(), "%f %f", &mTransU, &mTransV);
     std::sscanf(texScaleStr.c_str(), "%f %f", &mScaleU, &mScaleV);
     std::sscanf(texRotateStr.c_str(), "%f", &mSinR); // fuck
 
-    std::basic_istringstream texWrapMode(std::string(node.attribute("tex_tiling").as_string(def="repeat repeat")));
+    std::basic_istringstream texWrapMode(std::string(node.attribute("tex_tiling").as_string("repeat repeat")));
 
     std::string texWrapU, texWrapV;
     std::getline(texWrapMode, texWrapU, ' ');
     std::getline(texWrapMode, texWrapV, ' ');
 
-    mTexIdx = node.attribute("tex_image_idx").as_int(def=0);
-    mPalIdx = node.attribute("tex_palette_idx").as_int(def=0);
+    mTexIdx = node.attribute("tex_image_idx").as_int(0);
+    mPalIdx = node.attribute("tex_palette_idx").as_int(0);
 }
 
+/*
 void Material::Write(bStream::CStream& stream){
     stream.writeUInt16(0x0000); //item tag     0x02
     stream.writeUInt16(0x0000); // size        0x04
@@ -603,7 +603,6 @@ void Material::Write(bStream::CStream& stream){
 
     stream.writeUInt16(mWidth); // = stream.readUInt16();
     stream.writeUInt16(mHeight); // = stream.readUInt16();
-
     stream.writeUInt32(mMagW * (1 << 12));//  = fixed(stream.readUInt32());
     stream.writeUInt32(mMagH * (1 << 12));//  = fixed(stream.readUInt32());
 
@@ -623,6 +622,7 @@ void Material::Write(bStream::CStream& stream){
         stream.writeUInt32(mTransV * (1 << 12));// = fixed(stream.readUInt32());
     }
 }
+*/
 
 
 Model::Model(bStream::CStream& stream){
@@ -738,15 +738,16 @@ Model::Model(bStream::CStream& stream){
 
 Model::Model(pugi::xml_node node){
     // Generate materials
-    for(pugi::xml_node material = modelNode.child("material_array").child("material").first_child(); material; material = material.next_sibling()){
+    /*
+    for(pugi::xml_node material = node.child("material_array").child("material").first_child(); material; material = material.next_sibling()){
         mMaterials.mItems().push_back(std::make_shared<Material>(material));
     }
 
     std::vector<Mesh> meshes;
-    for(pugi::xml_node mesh = modelNode.child("polygon_array").child("polygon").first_child(); mesh; mesh = mesh.next_sibling()){
-        meshes.push_back(std::make_shared<Mesh>(mesh));
+    for(pugi::xml_node mesh = node.child("polygon_array").child("polygon").first_child(); mesh; mesh = mesh.next_sibling()){
+        //meshes.push_back(std::make_shared<Mesh>(mesh));
     }
-
+    */
 }
 
 void Model::Write(bStream::CStream& stream){
@@ -806,6 +807,7 @@ void NSBMD::LoadIMD(std::string path){
     }
 
     std::cout << "Generator: " << imd.child("imd").child("body").child("original_generator").attribute("name").as_string() << std::endl;
+
 
 }
 

@@ -76,6 +76,9 @@ namespace MDL0 {
         uint32_t mPolygonAttr;
         uint32_t mPolygonAttrMask;
         uint32_t mTexImgParams; // texwidth/height are duplicates?
+        uint32_t mTexImgParamsMask;
+        uint16_t mTexturePaletteBase;
+        uint16_t mFlag;
         glm::mat3x2 mTexMatrix;
         uint32_t mTexture { 0 };
 
@@ -113,6 +116,7 @@ namespace MDL0 {
         void Render();
 
         Mesh(){}
+        Mesh(pugi::xml_node node);
         Mesh(bStream::CStream& stream);
         ~Mesh(){}
     };
