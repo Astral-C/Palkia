@@ -94,13 +94,13 @@ void InitShaders(){
     glAttachShader(mProgram, vs);
     glAttachShader(mProgram, fs);
     glLinkProgram(mProgram);
-    glGetProgramiv(mProgram, GL_LINK_STATUS, &status); 
+    glGetProgramiv(mProgram, GL_LINK_STATUS, &status);
     if(GL_FALSE == status) {
-        int32_t logLen; 
-        glGetProgramiv(mProgram, GL_INFO_LOG_LENGTH, &logLen); 
-        glGetProgramInfoLog(mProgram, logLen, NULL, glErrorLogBuffer); 
+        int32_t logLen;
+        glGetProgramiv(mProgram, GL_INFO_LOG_LENGTH, &logLen);
+        glGetProgramInfoLog(mProgram, logLen, NULL, glErrorLogBuffer);
         //printf("[NSBMD Loader]: Shader Program Linking Error:\n%s\n", glErrorLogBuffer);
-    } 
+    }
     glDetachShader(mProgram, vs);
     glDetachShader(mProgram, fs);
     glDeleteShader(vs);
@@ -192,7 +192,7 @@ void Model::Render(){
             case 0x03:
                 curMtxID = cmd.mArgs[0];
                 break;
-        
+
             // Bind Material
             case 0x04:
             case 0x24:
@@ -213,7 +213,7 @@ void Model::Render(){
             case 0x46:
             case 0x66:
                 break;
-            
+
             // Calc Skinning
             case 0x09:
                 break;
@@ -228,7 +228,7 @@ void Model::Render(){
             default:
                 break;
         }
-    }    
+    }
 }
 
 RenderCommand::RenderCommand(bStream::CStream& stream){
@@ -240,12 +240,12 @@ RenderCommand::RenderCommand(bStream::CStream& stream){
             mArgs[0] = stream.readUInt8();
             mArgs[1] = stream.readUInt8();
             break;
-    
+
         // Load Matrix
         case 0x03:
             mArgs[0] = stream.readUInt8();
             break;
-    
+
         // Bind Material
         case 0x04:
         case 0x24:
@@ -270,7 +270,7 @@ RenderCommand::RenderCommand(bStream::CStream& stream){
             if(mOpCode == 0x26 || mOpCode == 0x46) break;
             mArgs[4] = stream.readUInt8();
             break;
-        
+
         // Unknown
         case 0x07:
         case 0x47:
@@ -325,7 +325,7 @@ Mesh::Mesh(bStream::CStream& stream){
     //std::cout << "Reading Geometry Commands at " << std::hex << pos << std::endl;
     std::shared_ptr<Primitive> currentPrimitive = std::make_shared<Primitive>();
     currentPrimitive->SetType(PrimitiveType::None);
-    
+
     struct {
         Vertex vtx {};
     } ctx;
@@ -341,13 +341,13 @@ Mesh::Mesh(bStream::CStream& stream){
                         currentPrimitive->SetType(mode);
                     }
                     break;
-                
+
                 case 0x41: {
 
                     if(currentPrimitive->GetType() == PrimitiveType::Quads){
                         std::vector<Vertex> triangulated;
                         auto verts = currentPrimitive->GetVertices();
-                        
+
                         for(size_t i = 0; i < verts.size(); i+=4){
                             triangulated.push_back(verts[i + 0]);
                             triangulated.push_back(verts[i + 1]);
@@ -369,7 +369,7 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x23: {
                     uint32_t a = stream.readUInt32();
                     uint32_t b = stream.readUInt32();
-                    
+
                     ctx.vtx.position.x = ((((int16_t)(a & 0xFFFF)) << 16) >> 16) / 4096.0f;
                     ctx.vtx.position.y = ((((int16_t)((a >> 16) & 0xFFFF)) << 16) >> 16) / 4096.0f;
                     ctx.vtx.position.z = ((((int16_t)(b & 0xFFFF)) << 16) >> 16) / 4096.0f;
@@ -391,7 +391,7 @@ Mesh::Mesh(bStream::CStream& stream){
 
                 case 0x25: {
                     uint32_t a = stream.readUInt32();
-                    
+
                     ctx.vtx.position.x = ((((int16_t)((a >>  0) & 0xFFFF)) << 16) >> 16) / 4096.0f;
                     ctx.vtx.position.y = ((((int16_t)((a >> 16) & 0xFFFF)) << 16) >> 16) / 4096.0f;
 
@@ -404,7 +404,7 @@ Mesh::Mesh(bStream::CStream& stream){
 
                     ctx.vtx.position.x = ((((int16_t)((a >>  0) & 0xFFFF)) << 16) >> 16) / 4096.0f;
                     ctx.vtx.position.z = ((((int16_t)((a >> 16) & 0xFFFF)) << 16) >> 16) / 4096.0f;
-                    
+
                     currentPrimitive->Push(ctx.vtx);
                     break;
                 }
@@ -414,7 +414,7 @@ Mesh::Mesh(bStream::CStream& stream){
 
                     ctx.vtx.position.y = ((((int16_t)((a >>  0) & 0xFFFF)) << 16) >> 16) / 4096.0f;
                     ctx.vtx.position.z = ((((int16_t)((a >> 16) & 0xFFFF)) << 16) >> 16) / 4096.0f;
-                    
+
                     currentPrimitive->Push(ctx.vtx);
                     break;
                 }
@@ -469,8 +469,8 @@ Mesh::Mesh(bStream::CStream& stream){
                 case 0x14:{
                     ctx.vtx.matrixId = stream.readUInt32();
                     break;
-                } 
-                
+                }
+
                 case 0x1b: {
                     stream.readUInt32();
                     stream.readUInt32();
@@ -499,25 +499,25 @@ Mesh::Mesh(bStream::CStream& stream){
 }
 
 Mesh::Mesh(pugi::xml_node node){
-    
+
 }
 
 Material::Material(bStream::CStream& stream){
     stream.readUInt16(); //item tag     0x02
     stream.readUInt16(); // size        0x04
-    
+
     mDiffAmb = stream.readUInt32(); //  0x08
     mSpeEmi = stream.readUInt32();  //  0x0C
     mPolygonAttr = stream.readUInt32(); // 0x10
     mPolygonAttrMask = stream.readUInt32(); // 0x14
     mTexImgParams = stream.readUInt32(); // 0x18
-    mTexImgParamsMask = stream.readUInt32(); //0x1C
-    
-    mTexturePaletteBase = stream.readUInt16(); 
-    mFlag = stream.readUInt16();
-    
-    mWidth = stream.readUInt16();
-    mHeight = stream.readUInt16();
+
+    uint32_t texImgParamsMask = stream.readUInt32(); //0x1C
+    uint16_t texturePaletteBase = stream.readUInt16();
+    uint16_t flag = stream.readUInt16();
+
+    uint16_t oWidth = stream.readUInt16();
+    uint16_t oHeight = stream.readUInt16();
 
     mMagW = fixed(stream.readUInt32());
     mMagH = fixed(stream.readUInt32());
@@ -527,7 +527,7 @@ Material::Material(bStream::CStream& stream){
         mScaleU = fixed(stream.readInt32());
         mScaleV = fixed(stream.readInt32());
     }
-    
+
     if(!(flag & 0x0004)){
         mSinR = fixed(stream.readUInt32());
         mCosR = fixed(stream.readUInt32());
@@ -559,7 +559,7 @@ Material::Material(pugi::xml_node node){
     std::string spec = std::string(node.attribute("specular").as_string(def="0 0 0"));
 
     uint8_t r1, g1, b1, r2, g2, b2;
-    
+
     std::sscanf(diff.c_str(), "%u %u %u", &r1, &g1, &b1);
     std::sscanf(amb.c_str(), "%u %u %u", &r2, &g2, &b2);
     mDiffAmb = (b1 | g1 >> 5 | r1 >> 10) | ((b2 | g2 >> 5 | r2 >> 10) >> 16);
@@ -568,7 +568,7 @@ Material::Material(pugi::xml_node node){
     std::sscanf(spec.c_str(), "%u %u %u", &r2, &g2, &b2);
     mSpecEmi = (b1 | g1 >> 5 | r1 >> 10) | ((b2 | g2 >> 5 | r2 >> 10) >> 16);
 
-    std::string texTransStr = std::string(node.attribute("tex_translate").as_string(def="0.00 0.00"));    
+    std::string texTransStr = std::string(node.attribute("tex_translate").as_string(def="0.00 0.00"));
     std::string texScaleStr = std::string(node.attribute("tex_scale").as_string(def="1.00 1.00"));
     std::string texRotateStr = std::string(node.attribute("tex_rotate").as_string(def="0.00"));
 
@@ -589,18 +589,18 @@ Material::Material(pugi::xml_node node){
 void Material::Write(bStream::CStream& stream){
     stream.writeUInt16(0x0000); //item tag     0x02
     stream.writeUInt16(0x0000); // size        0x04
-    
+
     stream.writeUInt32(mDiffAmb); // = stream.readUInt32(); //  0x08
     stream.writeUInt32(mSpeEmi); // = stream.readUInt32();  //  0x0C
     stream.writeUInt32(mPolygonAttr); // = stream.readUInt32(); // 0x10
     stream.writeUInt32(mPolygonAttrMask); // = stream.readUInt32(); // 0x14
-    
+
     stream.write(mTexImgParams); // = stream.readUInt32(); // 0x18
 
     stream.writeUInt32(mTexImgParamsMask); // = stream.readUInt32(); //0x1C
-    stream.writeUInt16(mTexturePaletteBase); // = stream.readUInt16(); 
+    stream.writeUInt16(mTexturePaletteBase); // = stream.readUInt16();
     stream.writeUInt32(mFlag); // = stream.readUInt16();
-    
+
     stream.writeUInt16(mWidth); // = stream.readUInt16();
     stream.writeUInt16(mHeight); // = stream.readUInt16();
 
@@ -612,7 +612,7 @@ void Material::Write(bStream::CStream& stream){
         stream.writeUInt32(mScaleU * (1 << 12)); // = fixed(stream.readInt32());
         stream.writeUInt32(mScaleV * (1 << 12)); // = fixed(stream.readInt32());
     }
-    
+
     if(!(flag & 0x0004)){
         stream.writeUInt32(mSinR * (1 << 12)); // = fixed(stream.readUInt32());
         stream.writeUInt32(mCosR * (1 << 12)); // = fixed(stream.readUInt32());
@@ -629,7 +629,7 @@ Model::Model(bStream::CStream& stream){
     size_t modelOffset = stream.tell();
     //std::cout << "Reading model at " << std::hex << stream.tell() << std::endl;
     stream.readUInt32(); // size of MDL0?
-    uint32_t renderCMDOffset = stream.readUInt32(); 
+    uint32_t renderCMDOffset = stream.readUInt32();
     uint32_t materialsOffset = stream.readUInt32();
     uint32_t meshesOffset = stream.readUInt32();
     uint32_t inverseBindMatsOffset = stream.readUInt32();
@@ -807,8 +807,6 @@ void NSBMD::LoadIMD(std::string path){
 
     std::cout << "Generator: " << imd.child("imd").child("body").child("original_generator").attribute("name").as_string() << std::endl;
 
-    //
-
 }
 
 void NSBMD::Load(bStream::CStream& stream){
@@ -837,16 +835,16 @@ void NSBMD::Load(bStream::CStream& stream){
                 break;
             }
 
-            case 0x30584554: { // TEX0 
+            case 0x30584554: { // TEX0
                 TEX0::Parse(stream, sectionOffset, mTextures, mPalettes);
-                break;   
+                break;
             }
 
             default:
                 break;
         }
-    
-    
+
+
         stream.seek(returnOffset);
 
     }
@@ -868,7 +866,6 @@ void NSBMD::Load(bStream::CStream& stream){
 
     mReady = true;
 }
-
 
 void NSBMD::AttachNSBTX(NSBTX* nsbtx){
     // Copy materials and palettes from nsbtx to nsbmd

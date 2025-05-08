@@ -13,7 +13,7 @@ namespace Palkia {
 class NSBMD;
 
 namespace MDL0 {
-    
+
     typedef enum {
         Triangles,
         Quads,
@@ -54,8 +54,8 @@ namespace MDL0 {
     };
 
     class Bone { };
-    
-    struct RenderCommand { 
+
+    struct RenderCommand {
         uint8_t mOpCode { 1 };
         uint8_t mArgs[25] { 0 };
 
@@ -70,7 +70,7 @@ namespace MDL0 {
         uint8_t mIsBound;
     };
 
-    class Material { 
+    class Material {
         uint32_t mDiffAmb;
         uint32_t mSpeEmi;
         uint32_t mPolygonAttr;
@@ -79,7 +79,7 @@ namespace MDL0 {
         glm::mat3x2 mTexMatrix;
         uint32_t mTexture { 0 };
 
-        uint32-t mModulateMode { 0 };
+        uint32_t mModulateMode { 0 };
         uint32_t mTexIdx { 0xFFFFFFFF };
         uint32_t mPalIdx { 0xFFFFFFFF };
         uint16_t mWidth { 0 }, mHeight { 0 };
@@ -154,8 +154,9 @@ class NSBMD {
     Nitro::ResourceDict<std::shared_ptr<TEX0::Texture>> mTextures;
     Nitro::ResourceDict<std::shared_ptr<TEX0::Palette>> mPalettes;
     std::map<std::pair<std::string, std::string>, uint32_t> mLoadedTexturePairs = {};
-    
+
 public:
+    void ReplaceTextureName(std::string btx_tex_name, std::string bmd_tex_name, NSBTX* nsbtx);
     void AttachNSBTX(NSBTX* nsbtx);
 
     void Render(glm::mat4 v, uint32_t);

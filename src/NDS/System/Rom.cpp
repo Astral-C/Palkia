@@ -348,7 +348,6 @@ void Rom::Save(std::filesystem::path p){
 
 	romFile.seek(0x00);
 	romFile.writeBytes((uint8_t*)&mHeader, sizeof(mHeader));
-
 }
 
 Rom::~Rom(){}

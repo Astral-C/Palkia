@@ -120,6 +120,8 @@ class Rom {
 		Banner GetBanner();
 
 		std::shared_ptr<File> GetFile(std::filesystem::path);
+		std::vector<Overlay>& GetOverlays7() { return mOverlays7; }
+		std::vector<Overlay>& GetOverlays9() { return mOverlays9; }
 
 		FileSystem GetFS() { return mFS; }
 
@@ -127,6 +129,7 @@ class Rom {
 
 		Rom(std::filesystem::path);
 		void Save(std::filesystem::path);
+		bStream::CMemoryStream Save();
 		void GetRawIcon(Color out[32][32]);
 
 		~Rom();
