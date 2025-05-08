@@ -25,7 +25,7 @@ std::vector<uint8_t> NCGR::Convert(uint32_t w, uint32_t h,  NCLR& pal){
                         image[dst]   = color.r;
                         image[dst+1] = color.g;
                         image[dst+2] = color.b;
-                        image[dst+3] = 0xFF;
+                        image[dst+3] = mTiles[t][(y * 8) + x] == 0 ? 0x00 : 0xFF;
                     }
                 }
             }
@@ -56,7 +56,9 @@ void NCGR::Load(bStream::CStream& stream){
         uint32_t tileDataSize = stream.readUInt32();
         uint32_t tileDataOffset = stream.readUInt32();
 
-        mTiles.resize(mWidth * mHeight);
+        uint32_t readOffset = stream.tell();
+
+        mTiles.resize(mBitDepth == 3 ? tileDataSize / 32 : tileDataSize / 64);
         stream.seek(tileDataOffset+24);
 
         for (int i = 0; i < mTiles.size(); i++) {
@@ -72,6 +74,8 @@ void NCGR::Load(bStream::CStream& stream){
                 }
             }
         }
+
+        stream.seek(readOffset);
     }
 
     { // most of this is unused
